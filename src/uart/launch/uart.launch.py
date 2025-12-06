@@ -10,8 +10,13 @@ def generate_launch_description():
             name='uart',  # ROS 网络中节点的自定义名称
             output='screen',  # 将节点输出打印到屏幕
             emulate_tty=True,  # 对于Python节点，这通常能帮助立即看到 print 输出
-            parameters=[  # 如果需要传递参数 (可选)
-                # {'param_name': 'param_value'}
+            parameters=[  # ROS2要求为list；每个dict是一组参数覆盖
+                {
+                    'port': '/dev/ttyS3',
+                    'baud': 460800,
+                    'chat_topic': '/uart/chat_gpt_enable',
+                    'timestamp_topic': '/uart/timestamp',
+                }
             ]
         )
     ])

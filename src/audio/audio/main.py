@@ -3,4 +3,4 @@ from rclpy.node import Node
 
 
 def main(args=None):
-    print('audioNode started')
+    print('音频节点启动')

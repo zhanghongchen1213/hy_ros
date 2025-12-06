@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'all_launch'
+package_name = 'uart'
 
 setup(
     name=package_name,
@@ -10,13 +10,13 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        # 添加launch文件配置
-        ('share/' + package_name + '/launch', ['launch/all_launch.launch.py']),
+            # 添加launch文件配置
+        ('share/' + package_name + '/launch', ['launch/uart.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='k',
-    maintainer_email='k@todo.todo',
+    maintainer_email='k@localhost',
     description='TODO: Package description',
     license='Apache-2.0',
     extras_require={
@@ -26,6 +26,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+              # 添加节点入口点
+            'uart_node = uart.main:main',
         ],
     },
 )

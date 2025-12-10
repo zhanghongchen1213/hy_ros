@@ -59,3 +59,49 @@
 ## 测试与校验
 - 运行 `colcon test`，保持 linters 通过；若第三方警告可记录并说明原因。
 - 所有新增包在 `setup.py` 的 `extras_require['test']` 中包含 `pytest`。
+
+
+## 脚本结构规范（必须遵循）
+- 入口函数：所有脚本必须以 `main()` 为入口；其他逻辑通过函数调用实现。
+- 单一职责：每个函数只负责一个明确功能；通过参数与返回值进行通信；禁止隐式全局副作用。
+- 工具依赖管理：为每个外部工具实现独立的检测/安装函数，例如：
+  - `require_tool_iproute2()`、`require_tool_net_tools()`、`require_tool_nfs_common()`、`install_packages()`。
+  - 检测未通过时自动安装，并在安装后进行状态验证（`dpkg -s <pkg>`）。
+- 错误处理：统一使用 `set -euo pipefail` 与 `trap 'log_error ...' ERR`；关键操作前进行输入参数校验与失败回滚/退出。
+- 日志：统一中文日志，提供 `log_info/log_warn/log_error`；关键步骤均需输出。
+
+### 代码结构示例
+```
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'log_error "执行失败：第$LINENO行，退出码=$?"' ERR
+
+ts(){ date '+%F %T'; }
+log_info(){ echo "[INFO $(ts)] $*"; }
+log_error(){ echo "[ERROR $(ts)] $*" >&2; }
+
+install_packages(){ apt-get update -y && apt-get install -y "$@"; }
+require_tool_iproute2(){ command -v ip || install_packages iproute2; }
+
+get_ipv4(){ ip -4 -o addr show up | awk '$2!="lo"{split($4,a,"/"); print a[1]; exit}'; }
+
+main(){
+  require_tool_iproute2
+  local ip="$(get_ipv4)"
+  log_info "本机IP: $ip"
+}
+
+main "$@"
+```
+
+### 函数文档注释指南
+- 每个重要函数需在定义前添加用途与参数/返回值说明（中文）：
+```
+# 功能：基于 IPv4 生成固定 /24 网段
+# 参数：ip（IPv4 字符串）
+# 返回：CIDR（例如 192.168.22.0/24）
+cidr_24_from_ip(){ ... }
+```
+
+### 强制要求
+- 本仓库后续新增/修改的所有脚本必须严格遵循以上规范；代码评审以此为准。

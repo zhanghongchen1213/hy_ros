@@ -14,6 +14,7 @@ author = '晨曦烧录君'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = ['myst_parser', 'sphinx_markdown_tables']
+myst_enable_extensions = ['attrs_inline']
 
 templates_path = ['_templates']
 exclude_patterns = []

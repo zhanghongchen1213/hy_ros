@@ -83,7 +83,7 @@ class UartNode(Node):
                     if data:  # 确认读取到非空数据
                         self._buf.extend(data)  # 追加到解析缓冲区
                         # 调试：打印HEX数据
-                        # self.get_logger().info(f'收到数据：{[hex(b) for b in data]}')
+                        self.get_logger().debug(f'收到数据：{[hex(b) for b in data]}')
                         self._parse()  # 触发解析流程（可能解析出多帧）
                 else:  # 没有数据
                     time.sleep(0.001)  # 短暂休眠，降低 CPU 占用
@@ -171,8 +171,8 @@ class UartNode(Node):
                 self.pub_chat.publish(Bool(data=chat))
             if ts is not None:  # 有效则发布 timestamp 话题
                 self.pub_ts.publish(UInt32(data=ts))
-            if chat is not None or ts is not None:  # 调试：打印解析日志
-                self.get_logger().info(f'解析上行：ChatGPT启用={chat}，时间戳={ts}，载荷长度={len(payload)}')
+            # if chat is not None or ts is not None:  # 调试：打印解析日志
+                self.get_logger().debug(f'解析上行：ChatGPT启用={chat}，时间戳={ts}，载荷长度={len(payload)}')
 
     def destroy_node(self):  # 节点销毁：停止读线程并释放串口资源
         self._stop.set()  # 设置停止事件，通知后台线程退出
@@ -193,6 +193,7 @@ class UartNode(Node):
         p = self.get_parameter(name)
         v = p.value
         if isinstance(v, str) and len(v) > 0:
+            self.get_logger().info(f"参数 '{name}' 值为 {v}")
             return v
         if v is None or (isinstance(v, str) and len(v) == 0):
             self.get_logger().fatal(f"缺少必需参数 '{name}'（字符串）")
@@ -204,6 +205,7 @@ class UartNode(Node):
         p = self.get_parameter(name)
         v = p.value
         if isinstance(v, int):
+            self.get_logger().info(f"参数 '{name}' 值为 {v}")
             return v
         if v is None:
             self.get_logger().fatal(f"缺少必需参数 '{name}'（整数）")

@@ -13,8 +13,8 @@ def generate_launch_description():
     uart_share = get_package_share_directory('uart')
     uart_launch = os.path.join(uart_share, 'launch', 'uart.launch.py')
     
-    audio_share = get_package_share_directory('audio')
-    audio_launch = os.path.join(audio_share, 'launch', 'audio.launch.py')
+    audio_asr_share = get_package_share_directory('audio_asr')
+    audio_asr_launch = os.path.join(audio_asr_share, 'launch', 'audio_asr.launch.py')
 
     return LaunchDescription([
         # IncludeLaunchDescription(
@@ -26,6 +26,6 @@ def generate_launch_description():
         ),
         
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(audio_launch)
+            PythonLaunchDescriptionSource(audio_asr_launch)
         ),
     ])

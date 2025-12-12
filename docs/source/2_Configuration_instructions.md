@@ -364,8 +364,7 @@ sudo apt-get install libportaudio2  # 安装 PortAudio 库
 pip3 install sounddevice # 安装 Python 音频处理库
 
 # 2.2 rkllm ros2_api需求库
-
-
+sudo apt-get install libopencv-dev python3-opencv # 安装 OpenCV 库
 ```
 
 - 首先分析图片中的报错信息，然后中文输出报错信息，其次提供你认为报错的原因，最后给出你的解决方案并调整代码。不需要你直接在终端测试，因为你现在的环境是本机环境，与端侧环境无关，你只需要在本机环境下执行 colcon build 无报错即可，我会在端侧自行验证并给你提供反馈，咱们一起协同快速开发。

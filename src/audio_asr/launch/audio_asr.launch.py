@@ -33,21 +33,21 @@ def generate_launch_description():
                     # ALSA 输入设备（录音源），例如麦克风卡槽
                     'alsa_device': 'plughw:3,0',
                     # CLI 模式下的静默超时秒数，用于平滑终止子进程
-                    'silence_timeout_sec': 3.0,
+                    'silence_timeout_sec': 2.0,
                     # 模式选择：True 走 CLI（sherpa-onnx-alsa）；False 走 Python API
                     'use_cli': False,
+                    
                     # 端点检测规则1：基础静默超时（秒）。
                     # 含义：只要静默时间超过此值，即视为一句话结束。
-                    'rule1_min_trailing_silence': 3.0,
+                    'rule1_min_trailing_silence': 2.0,
                     
                     # 端点检测规则2：长语音静默超时（秒）。
                     # 含义：当语音长度超过 rule3 时，使用此较短的静默阈值来快速断句。
-                    'rule2_min_trailing_silence': 3.0,
+                    'rule2_min_trailing_silence': 1.5,
                     
                     # 端点检测规则3：触发规则2的最短语音长度（秒）。
                     # 含义：只有当前语音长度超过此值，才应用 rule2。
-                    # 配置：由于 rule1 和 rule2 相同，此参数实际上不再影响逻辑，保持默认或设为 0 均可。
-                    'rule3_min_utterance_length': 0.0,
+                    'rule3_min_utterance_length': 8.0,
                     'target_device_idx': 3,
                 }
             ],

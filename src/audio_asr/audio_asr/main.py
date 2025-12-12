@@ -277,6 +277,9 @@ class AudioAsrNode(Node):
         sample_rate = 48000
         samples_per_read = int(0.1 * sample_rate)  # 0.1秒
 
+        # 标志位：是否已经发送了 START 信号
+        has_sent_start = False
+
         try:
             # 使用 sounddevice 阻塞读取模式
             with sd.InputStream(
@@ -326,10 +329,18 @@ class AudioAsrNode(Node):
 
                     # 若识别到非空文本，则发布到 ROS 话题
                     if text:
+                        # 如果是本句对话的第一个有效文本，先发送 START
+                        if not has_sent_start:
+                            self._publish_text("START")
+                            has_sent_start = True
+                            
                         self._publish_text(text)
                         
                     # 只要检测到端点（无论是否有文本），都需要处理流的重置或退出
                     if is_endpoint:
+                        # 调试：如果检测到端点，强制打印结果状态
+                        self.get_logger().debug(f"端点检测触发。识别文本: '{text}'")
+
                         if not self._chat_last:
                             # 非连续模式：结束循环
                             break
@@ -337,6 +348,7 @@ class AudioAsrNode(Node):
                             if text:
                                 # 只有当真的识别到了文本，且到了端点，才重置。
                                 # 如果是空文本触发端点（通常是噪音），选择不重置或者根据策略重置
+                                # 这里为了防止噪音打断，我们尝试：如果是空文本触发端点，也重置，防止卡死
                                 self.get_logger().debug("连续识别模式：重置识别流")
                                 recognizer.reset(stream)
                             else:
@@ -347,6 +359,10 @@ class AudioAsrNode(Node):
         except Exception as e:
             # 捕获音频流读取或识别过程中的任何异常，记录中文错误日志
             self.get_logger().error(f'音频流读取或识别异常: {e}')
+
+        # 无论正常结束还是异常退出，只要发送过 START，就补发 END
+        if has_sent_start:
+             self._publish_text("END")
 
 
 def main(args=None):

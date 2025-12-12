@@ -12,8 +12,9 @@
 
   <!-- START添加所有需要的launch文件的依赖 -->
   <exec_depend>ament_index_python</exec_depend>
-  <exec_depend>audio_asr</exec_depend>
   <exec_depend>uart</exec_depend>
+  <exec_depend>audio_asr</exec_depend>
+  <exec_depend>audio_rkllm</exec_depend>
   <!-- END添加所有需要的launch文件的依赖 -->
 
   <test_depend>ament_copyright</test_depend>

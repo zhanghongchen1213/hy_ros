@@ -8,9 +8,13 @@
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
+  <depend>std_msgs</depend>
   <depend>launch</depend>
   <depend>launch_ros</depend>
+  
+  <!-- START添加依赖 -->
   <exec_depend>sherpa-onnx</exec_depend>
+  <!-- END添加依赖 -->
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

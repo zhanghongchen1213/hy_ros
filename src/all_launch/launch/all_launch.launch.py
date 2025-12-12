@@ -6,26 +6,31 @@ import os
 
 
 def generate_launch_description():
-    # cerebellum 功能包：示例聚合项
-    # cerebellum_share = get_package_share_directory('cerebellum')
-    # cerebellum_launch = os.path.join(cerebellum_share, 'launch', 'cerebellum.launch.py')
-    
+    # 1. uart 节点
     uart_share = get_package_share_directory('uart')
     uart_launch = os.path.join(uart_share, 'launch', 'uart.launch.py')
     
+    # 2. audio_asr 节点
     audio_asr_share = get_package_share_directory('audio_asr')
     audio_asr_launch = os.path.join(audio_asr_share, 'launch', 'audio_asr.launch.py')
+    
+    # 3. audio_rkllm 节点
+    audio_rkllm_share = get_package_share_directory('audio_rkllm')
+    audio_rkllm_launch = os.path.join(audio_rkllm_share, 'launch', 'audio_rkllm.launch.py')
 
     return LaunchDescription([
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(cerebellum_launch)
-        # ),
-        
+        # 1. uart 节点
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(uart_launch)
         ),
         
+        # 2. audio_asr 节点
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(audio_asr_launch)
+        ),
+
+        # 3. audio_rkllm 节点
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(audio_rkllm_launch)
         ),
     ])

@@ -1,30 +1,52 @@
 #include "audio_rkllm.h"
 
-class HelloWorldNode : public rclcpp::Node
+RKLLMTestNode::RKLLMTestNode()
+    : Node("rkllm_test_node"), rkllm_initialized_(false)
 {
-public:
-    HelloWorldNode()
-        : Node("hello_world_node")
-    {
-        // 创建定时器，每500ms触发一次
-        timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(500),
-            std::bind(&HelloWorldNode::timer_callback, this));
-    }
+    // 创建定时器，每 1000ms 触发一次，用于周期性检查状态
+    timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(1000),
+        std::bind(&RKLLMTestNode::timer_callback, this));
+        
+    RCLCPP_INFO(this->get_logger(), "RKLLM Test Node Started.");
 
-private:
-    void timer_callback()
-    {
-        RCLCPP_INFO(this->get_logger(), "Hello world!");
+    // 尝试调用 RKLLM 的初始化函数（仅测试链接，不传入真实参数）
+    // 注意：rkllm_init 通常需要真实的模型路径和配置，这里传入 nullptr 预期会失败
+    // 但我们的目的是验证符号 'rkllm_init' 是否能被成功链接和调用。
+    LLMHandle handle = nullptr;
+    RKLLMParam param;
+    // 简单初始化结构体，避免未定义行为
+    param.model_path = ""; 
+    
+    RCLCPP_INFO(this->get_logger(), "Attempting to call rkllm_init to verify linking...");
+    
+    // 调用 rkllm_init。即使失败，只要不报 "undefined reference"，说明链接成功。
+    // 修复：rkllm_init 的第二个参数定义为 RKLLMParam 类型（值传递或引用），而非指针。
+    // 根据报错 'could not convert ... to RKLLMParam'，说明函数签名期望的是 RKLLMParam 结构体本身，而不是其指针。
+    int ret = rkllm_init(&handle, param, nullptr);
+    
+    if (ret == 0) {
+        RCLCPP_INFO(this->get_logger(), "rkllm_init returned 0 (Success? Unexpected for empty param).");
+    } else {
+        // 这是预期结果，因为参数为空。关键是我们成功调用了它！
+        RCLCPP_INFO(this->get_logger(), "rkllm_init called successfully (returned %d, as expected for empty params). Linking verified!", ret);
     }
+    
+    // 如果 handle 被赋值了（虽然不太可能），记得释放
+    if (handle != nullptr) {
+        rkllm_destroy(handle);
+    }
+}
 
-    rclcpp::TimerBase::SharedPtr timer_;
-};
+void RKLLMTestNode::timer_callback()
+{
+    RCLCPP_INFO(this->get_logger(), "Node is running... (RKLLM symbols are available)");
+}
 
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<HelloWorldNode>();
+    auto node = std::make_shared<RKLLMTestNode>();
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

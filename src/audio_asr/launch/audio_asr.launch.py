@@ -39,15 +39,15 @@ def generate_launch_description():
                     
                     # 端点检测规则1：基础静默超时（秒）。
                     # 含义：只要静默时间超过此值，即视为一句话结束。
-                    'rule1_min_trailing_silence': 2.0,
+                    'rule1_min_trailing_silence': 1.5,
                     
                     # 端点检测规则2：长语音静默超时（秒）。
                     # 含义：当语音长度超过 rule3 时，使用此较短的静默阈值来快速断句。
-                    'rule2_min_trailing_silence': 1.5,
+                    'rule2_min_trailing_silence': 1.0,
                     
                     # 端点检测规则3：触发规则2的最短语音长度（秒）。
                     # 含义：只有当前语音长度超过此值，才应用 rule2。
-                    'rule3_min_utterance_length': 8.0,
+                    'rule3_min_utterance_length': 5.0,
                     'target_device_idx': 3,
                 }
             ],

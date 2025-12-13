@@ -304,35 +304,43 @@ sherpa-onnx-alsa \
 
 ---
 
-### 1.3 配置 RKLLM Qwen2-VL 模型
+### 1.3 配置 RKLLM Qwen3-VL 模型
 
 ```shell
 mkdir /opt/rknn-llm
 cd /opt/rknn-llm
 # 上传rknn-llm-release-v1.2.1.zip到/opt/rknn-llm/目录下
-cp /mnt/nfs/hy_ros/source/0.RK3588S/2.rknn-llm/rknn-llm-release-v1.2.1b1.zip /opt/rknn-llm/
+cp /mnt/nfs/hy_ros/source/0.RK3588S/2.rknn-llm/rknn-llm.zip /opt/rknn-llm/
 
-unzip rknn-llm-release-v1.2.1b1.zip
-rm rknn-llm-release-v1.2.1b1.zip
+unzip rknn-llm.zip
+rm rknn-llm.zip
 
-# 进入Qwen2-VL_Demo/deploy目录
-cd /opt/rknn-llm/rknn-llm-release-v1.2.1b1/examples/Qwen2-VL-2B_Demo/deploy
+# 进入multimodal_model_demo/deploy目录
+cd /opt/rknn-llm/rknn-llm/examples/multimodal_model_demo/deploy
 chmod +x build-linux.sh
 ./build-linux.sh
+
+# 更新librkllmrt.so库
+cp /opt/rknn-llm/rknn-llm/rkllm-runtime/Linux/librkllm_api/aarch64/librkllmrt.so /lib/
+chmod +x /lib/librkllmrt.so
+
+# 更新rkllm.h头文件
+cp /opt/rknn-llm/rknn-llm/rkllm-runtime/Linux/librkllm_api/include/rkllm.h /usr/include/
 
 # 进入示例目录
 cd install/demo_Linux_aarch64
 
 # 复制模型文件到示例目录
-cp /mnt/nfs/hy_ros/source/0.RK3588S/2.rknn-llm/Qwen2-VL-2B_llm_w8a8_rk3588.rkllm /opt/rknn-llm/
-cp /mnt/nfs/hy_ros/source/0.RK3588S/2.rknn-llm/Qwen2-VL-2B_vision_rk3588.rknn /opt/rknn-llm/
-chmod +x /opt/rknn-llm/Qw*
+cp /mnt/nfs/hy_ros/source/0.RK3588S/2.rknn-llm/qwen3-vl-2b_vision_rk3588.rknn /opt/rknn-llm/
+
+cp /mnt/nfs/hy_ros/source/0.RK3588S/2.rknn-llm/qwen3-vl-2b-instruct_w8a8_rk3588.rkllm /opt/rknn-llm/
+chmod +x /opt/rknn-llm/qwen*
 
 # 设置环境变量
 export LD_LIBRARY_PATH=./lib
 
 # 运行示例
-./demo demo.jpg /opt/rknn-llm/Qwen2-VL-2B_vision_rk3588.rknn /opt/rknn-llm/Qwen2-VL-2B_llm_w8a8_rk3588.rkllm 128 512 3
+./demo demo.jpg /opt/rknn-llm/qwen3-vl-2b_vision_rk3588.rknn /opt/rknn-llm/qwen3-vl-2b-instruct_w8a8_rk3588.rkllm 2048 4096 3
 ```
 
 ```{figure} _static/EDB7D880-5FEF-4FD0-92C5-3C97A1CB05A9.png
@@ -368,3 +376,7 @@ sudo apt-get install libopencv-dev python3-opencv # 安装 OpenCV 库
 ```
 
 - 首先分析图片中的报错信息，然后中文输出报错信息，其次提供你认为报错的原因，最后给出你的解决方案并调整代码。不需要你直接在终端测试，因为你现在的环境是本机环境，与端侧环境无关，你只需要在本机环境下执行 colcon build 无报错即可，我会在端侧自行验证并给你提供反馈，咱们一起协同快速开发。
+
+<image>介绍一下图片里的人物形象，年龄背景，人物特征
+
+- 接收来自'asr_text_topic': '/audio/asr_text'的文本消息，如果监听到 START ，则开始创建一个单独的线程，直到 END 结束，将中间的文本作为指令，作为 Qwen3-VL 模型的文本输入。如果检测到指令中包含"看一下”“拍张照片"字符，则调用摄像头拍摄一张照片，并将照片作为 Qwen3-VL 模型的视觉输入。将一次大模型推理的结果作为文本输出，输出到 'llm_result_topic': '/audio/llm_result'话题。如果在推理过程中再次监听到来自'asr_text_topic': '/audio/asr_text'的文本消息，即从 START 开始又有文本输入，则此时会先记录该文本信息，直到推理结束后直接将记录的到 END 的文本信息，作为大模型的输入。

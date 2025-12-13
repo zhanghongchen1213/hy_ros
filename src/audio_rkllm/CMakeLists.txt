@@ -17,6 +17,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Threads REQUIRED) 
 
 # 5.新增：包含 src 目录以支持同目录下的头文件（必选）
 include_directories(include src ${OpenCV_INCLUDE_DIRS})
@@ -32,6 +33,7 @@ set(RKLLM_LIB_PATH /lib/librkllmrt.so)
 target_link_libraries(audio_rkllm_node
   ${RKLLM_LIB_PATH}
   ${OpenCV_LIBS}
+  Threads::Threads 
 )
 
 # 8.新增：链接依赖库（必选）

@@ -279,6 +279,8 @@ class AudioAsrNode(Node):
 
         # 标志位：是否已经发送了 START 信号
         has_sent_start = False
+        # 缓存：上一次发布的内容，用于计算增量
+        self.last_published_text = ""
 
         try:
             # 使用 sounddevice 阻塞读取模式
@@ -326,43 +328,69 @@ class AudioAsrNode(Node):
                     
                     text = text.strip()
                     
-
-                    # 若识别到非空文本，则发布到 ROS 话题
+                    # 关键逻辑修改：去重处理
+                    # 只有当本次识别到的文本比上一次发布的文本更长，且以其为前缀时，才发布新增部分。
+                    # 或者如果这是新的开始（has_sent_start=False），则直接发布。
+                    # 注意：流式ASR通常会输出不断变长的中间结果（如 "我", "我想", "我想你"）。
+                    # 下游 LLM 如果只是简单叠加，就会变成 "我我想我想你"。
+                    # 策略：不发布中间结果，只发布端点（整句）结果？或者发布全量但下游做去重？
+                    # 鉴于用户描述 LLM 是“连续监听话题，有内容就叠加”，那么 ASR 应该只发布“增量”内容，或者只在 END 时发布完整内容。
+                    # 但为了低延迟，我们应该发布增量。
+                    # 可是 sherpa-onnx 的 get_result 返回的是当前整句的完整识别结果。
+                    
+                    # 解决方案：维护一个 last_published_text，计算增量。
                     if text:
                         # 如果是本句对话的第一个有效文本，先发送 START
                         if not has_sent_start:
                             self._publish_text("START")
                             has_sent_start = True
-                            
-                        self._publish_text(text)
+                            self.last_published_text = "" # 新句子开始，重置去重缓存
+                        
+                        # 计算增量：如果 text 是 last_published_text 的延续
+                        if text.startswith(self.last_published_text):
+                            new_content = text[len(self.last_published_text):]
+                            if new_content:
+                                self._publish_text(new_content)
+                                self.last_published_text = text
+                        else:
+                            # 这种情况比较少见（修正了之前的识别错误），全量发布新版本或者只发布差异？
+                            # 简单起见，如果发生了回溯修正，这里可能需要更复杂的逻辑。
+                            # 现在的简单策略：直接发布当前完整 text，但这样可能会导致重复。
+                            # 更稳妥的策略：流式ASR场景下，如果下游是叠加的，ASR最好只输出“稳定”的增量。
+                            # 但 sherpa-onnx 默认输出包含非稳定部分。
+                            # 为了解决用户的“重复叠加”问题，最简单的办法是：只在 END 时发布一次最终结果？
+                            # 不行，那样延迟太高。
+                            # 采用增量发布：
+                            pass # 上面的 startswith 已经处理了正常增长的情况。
+                            # 如果 text 变短了或者变了（修正），暂不处理，等待更稳定的结果。
                         
                     # 只要检测到端点（无论是否有文本），都需要处理流的重置或退出
                     if is_endpoint:
                         # 调试：如果检测到端点，强制打印结果状态
                         self.get_logger().debug(f"端点检测触发。识别文本: '{text}'")
+                        
+                        # 关键修改：一旦检测到端点，且之前发送过START（说明有有效语音），立即发送END
+                        if has_sent_start:
+                             self._publish_text("END")
+                             has_sent_start = False # 重置标志，等待下一句话
+                             self.last_published_text = "" # 重置去重缓存
 
                         if not self._chat_last:
                             # 非连续模式：结束循环
                             break
                         else:
-                            if text:
-                                # 只有当真的识别到了文本，且到了端点，才重置。
-                                # 如果是空文本触发端点（通常是噪音），选择不重置或者根据策略重置
-                                # 这里为了防止噪音打断，我们尝试：如果是空文本触发端点，也重置，防止卡死
-                                self.get_logger().debug("连续识别模式：重置识别流")
-                                recognizer.reset(stream)
-                            else:
-                                 # 空文本触发端点，通常是噪音或VAD误判。
-                                 # 建议也重置，否则状态可能不对
-                                 self.get_logger().debug("连续识别模式（空结果）：重置识别流")
-                                 recognizer.reset(stream)
+                            # 连续识别模式：重置流，准备下一句
+                            self.get_logger().debug("连续识别模式：重置识别流")
+                            recognizer.reset(stream)
+
         except Exception as e:
             # 捕获音频流读取或识别过程中的任何异常，记录中文错误日志
             self.get_logger().error(f'音频流读取或识别异常: {e}')
 
-        # 无论正常结束还是异常退出，只要发送过 START，就补发 END
+        # 循环结束后的清理：如果因异常或其他原因退出循环，且处于未闭合状态，补发END
         if has_sent_start:
              self._publish_text("END")
+             self.last_published_text = ""
 
 
 def main(args=None):

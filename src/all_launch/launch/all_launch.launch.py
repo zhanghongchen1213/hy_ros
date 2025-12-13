@@ -17,6 +17,11 @@ def generate_launch_description():
     # 3. audio_rkllm 节点
     audio_rkllm_share = get_package_share_directory('audio_rkllm')
     audio_rkllm_launch = os.path.join(audio_rkllm_share, 'launch', 'audio_rkllm.launch.py')
+    
+    # 4. audio_tts 节点
+    audio_tts_share = get_package_share_directory('audio_tts')
+    audio_tts_launch = os.path.join(audio_tts_share, 'launch', 'audio_tts.launch.py')
+
 
     return LaunchDescription([
         # 1. uart 节点
@@ -32,5 +37,10 @@ def generate_launch_description():
         # 3. audio_rkllm 节点
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(audio_rkllm_launch)
+        ),
+        
+        # 4. audio_tts 节点
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(audio_tts_launch)
         ),
     ])

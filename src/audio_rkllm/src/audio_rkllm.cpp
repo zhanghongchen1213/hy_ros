@@ -289,15 +289,13 @@ void RKLLMNode::worker_loop()
         
         // 发布结束信号，告诉下游（TTS）本次生成结束
         // 这一步对于流式处理非常重要，下游需要知道什么时候断句
-        // 这里我们可以约定发布一个空的 String 消息，或者特定内容的 EOS 消息
-        // 为了兼容性，这里暂时不发特殊EOS，只打印日志。
-        // 如果TTS需要明确的结束符，可以再发布一次 "EOS" 或者空字符串，视TTS节点协议而定。
+        // 按照约定，发送 "END" 作为结束信号
         
-        // std_msgs::msg::String eos_msg;
-        // eos_msg.data = ""; // 或者 "<EOS>"
-        // pub_llm_result_->publish(eos_msg);
+        std_msgs::msg::String eos_msg;
+        eos_msg.data = "END";
+        pub_llm_result_->publish(eos_msg);
         
-        RCLCPP_INFO(this->get_logger(), "推理完成。流式输出已全部发布。");
+        RCLCPP_INFO(this->get_logger(), "推理完成。流式输出已全部发布 (发送 END 信号)。");
 
         // 清理临时文件
         if (current_instr.has_image && !current_instr.image_path.empty()) {

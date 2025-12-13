@@ -84,18 +84,6 @@ class AudioAsrNode(Node):
         self.get_logger().info('音频ASR节点已启动')
 
     def _require_str(self, name: str) -> str:
-        """
-        读取字符串参数（严格校验).
-
-        参数：
-        - name：参数名
-
-        返回：
-        - 字符串值（非空）
-
-        异常：
-        - RuntimeError：当参数缺失或类型不匹配时抛出
-        """
         p = self.get_parameter(name)
         v = p.value
         if isinstance(v, str) and len(v) > 0:
@@ -350,6 +338,7 @@ class AudioAsrNode(Node):
                         if text.startswith(self.last_published_text):
                             new_content = text[len(self.last_published_text):]
                             if new_content:
+                                self.get_logger().debug(f"增量发布: '{new_content}' (全量: '{text}')")
                                 self._publish_text(new_content)
                                 self.last_published_text = text
                         else:
@@ -357,12 +346,8 @@ class AudioAsrNode(Node):
                             # 简单起见，如果发生了回溯修正，这里可能需要更复杂的逻辑。
                             # 现在的简单策略：直接发布当前完整 text，但这样可能会导致重复。
                             # 更稳妥的策略：流式ASR场景下，如果下游是叠加的，ASR最好只输出“稳定”的增量。
-                            # 但 sherpa-onnx 默认输出包含非稳定部分。
-                            # 为了解决用户的“重复叠加”问题，最简单的办法是：只在 END 时发布一次最终结果？
-                            # 不行，那样延迟太高。
-                            # 采用增量发布：
-                            pass # 上面的 startswith 已经处理了正常增长的情况。
-                            # 如果 text 变短了或者变了（修正），暂不处理，等待更稳定的结果。
+                            self.get_logger().debug(f"文本回溯/非前缀更新，忽略: '{text}' (Last: '{self.last_published_text}')")
+                            pass 
                         
                     # 只要检测到端点（无论是否有文本），都需要处理流的重置或退出
                     if is_endpoint:

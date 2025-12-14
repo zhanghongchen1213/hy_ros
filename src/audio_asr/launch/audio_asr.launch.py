@@ -19,9 +19,11 @@ def generate_launch_description():
             parameters=[  # ROS2 要求为 list；内部为单个 dict 容器
                 {
                     # 控制开关话题（Bool），收到 True 开始识别，关闭后等待端点再退出
-                    'chat_topic': '/uart/chat_gpt_enable',  # 控制开关话题（Bool），收到 True 开始识别，关闭后等待端点再退出
+                    'sub_chat_topic': '/uart/chat_gpt_count',  # 控制开关话题（Bool），收到 True 开始识别，关闭后等待端点再退出
                     # 识别文本发布的话题名（String）
-                    'asr_text_topic': '/audio/asr_text',
+                    'pub_asr_text_topic': '/audio/asr_text',
+                     #音频状态发布话题，用于通知底层
+                    'pub_audio_status_topic': '/uart/audio_stream_flag',
                     # 推理后端提供者：CPU/GPU/RKNN 等；RK 平台通常使用 rknn
                     'provider': 'rknn',
                     # sherpa-onnx 模型三件套（RKNN 格式）：encoder/decoder/joiner

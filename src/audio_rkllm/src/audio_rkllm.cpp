@@ -47,10 +47,10 @@ RKLLMNode::RKLLMNode()
 
         // ------------------- ROS 接口参数 -------------------
         // 订阅 ASR 文本话题
-        std::string asr_topic = this->declare_parameter<std::string>("asr_text_topic");
+        std::string asr_topic = this->declare_parameter<std::string>("sub_asr_text_topic");
         
         // 发布 LLM 结果话题
-        std::string result_topic = this->declare_parameter<std::string>("llm_result_topic");
+        std::string result_topic = this->declare_parameter<std::string>("pub_llm_result_topic");
 
         // ------------------- 初始化 RKLLM -------------------
         if (!init_rkllm()) {

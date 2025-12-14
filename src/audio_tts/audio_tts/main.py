@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, UInt8
 import asyncio
 import threading
 import logging
@@ -16,7 +16,7 @@ class AudioTTSNode(Node):
         
         # 参数读取与校验
         # 按照 audio_asr 的规范，使用严格的参数获取方法
-        self.llm_topic = self._require_str('llm_topic')
+        self.llm_topic = self._require_str('sub_llm_topic')
         self.api_key = self._require_str('baidu_api_key')
         self.secret_key = self._require_str('baidu_secret_key')
         self.voice_id = self._require_str('baidu_voice_id')
@@ -32,7 +32,14 @@ class AudioTTSNode(Node):
 
         # 初始化组件
         self.server = HTTPSServer(loop=self.loop, port=self.http_port)
+        # 注册播放完成回调
+        self.server.on_play_finished = self._on_https_play_finished
+        
         self.tts_client = BaiduTTSClient(self.api_key, self.secret_key, self.voice_id)
+
+        # 音频状态发布话题
+        self.audio_status_topic = self._require_str('pub_audio_status_topic')
+        self.pub_status = self.create_publisher(UInt8, self.audio_status_topic, 10)
         
         # 创建文本处理队列和 worker
         self.text_queue = asyncio.Queue()
@@ -53,6 +60,11 @@ class AudioTTSNode(Node):
         self.punctuations = re.compile(r'[。，？！,?!.\n]+')
         
         self.get_logger().info(f'Audio TTS 节点已启动。监听话题: {self.llm_topic}, HTTP 服务端口: {self.http_port}')
+
+    def _on_https_play_finished(self):
+        """当 HTTPS 播放结束时调用的回调"""
+        self.get_logger().info("HTTPS 播放结束，发送状态 3")
+        self.pub_status.publish(UInt8(data=3))
 
     def _require_str(self, name: str) -> str:
         """
@@ -108,13 +120,23 @@ class AudioTTSNode(Node):
         while True:
             try:
                 text = await self.text_queue.get()
+                
+                # 检查是否为结束标记
+                if text is None:
+                    self.get_logger().info("TTS 合成全部完成，发送状态 2")
+                    self.pub_status.publish(UInt8(data=2))
+                    # 告知 Server 音频流已结束
+                    self.server.push_audio(None)
+                    self.text_queue.task_done()
+                    continue
+                
                 self.get_logger().info(f'Worker 开始合成: {text[:10]}...')
                 
                 # 显式使用 loop 调用 async 方法
                 # 注意：synthesize 是 async def，应该 await
                 await self.tts_client.synthesize(
                     text, 
-                    self.server.push_audio,
+                    self.server.push_audio, # 调用 HTTPServer 的 push_audio 方法
                     spd=self.spd,
                     pit=self.pit,
                     vol=self.vol,
@@ -152,6 +174,8 @@ class AudioTTSNode(Node):
                 self.loop.call_soon_threadsafe(self.text_queue.put_nowait, self.text_buffer)
                 self.text_buffer = ""
             
+            # 发送结束标记给 Worker，表示本轮对话结束
+            self.loop.call_soon_threadsafe(self.text_queue.put_nowait, None)
             return
 
         self.text_buffer += text
@@ -166,7 +190,7 @@ class AudioTTSNode(Node):
                 self.text_buffer = self.text_buffer[end_pos:]
                 
                 # 将分好的句子放入队列
-                self.get_logger().info(f'分句加入队列: {sentence}')
+                self.get_logger().debug(f'分句加入队列: {sentence}')
                 self.loop.call_soon_threadsafe(self.text_queue.put_nowait, sentence)
             else:
                 break

@@ -14,8 +14,8 @@ def generate_launch_description():
                 {
                     'port': '/dev/ttyS3',
                     'baud': 460800,
-                    'chat_topic': '/uart/chat_gpt_enable',
-                    'timestamp_topic': '/uart/timestamp',
+                    'pub_chat_topic': '/uart/chat_gpt_count',
+                    'sub_audio_status_topic': '/uart/audio_stream_flag',
                 }
             ]
         )

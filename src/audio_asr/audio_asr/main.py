@@ -14,7 +14,7 @@
 import sys
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, UInt16, UInt8
 import threading
 import time
 import subprocess
@@ -46,8 +46,8 @@ class AudioAsrNode(Node):
         - 初始化识别状态与线程句柄，输出启动日志。
 
         读取的关键参数（均由 launch 传入）：
-        - chat_topic：控制识别开关的订阅话题（Bool）
-        - asr_text_topic：识别文本发布话题（String）
+        - sub_chat_topic：控制识别开关的订阅话题（Bool）
+        - pub_asr_text_topic：识别文本发布话题（String）
         - provider：推理后端提供者（例如 'rknn'）
         - encoder/decoder/joiner/tokens：模型与词表路径
         - alsa_device：ALSA 输入设备标识
@@ -60,8 +60,8 @@ class AudioAsrNode(Node):
             allow_undeclared_parameters=False,
             automatically_declare_parameters_from_overrides=True,
         )
-        chat_topic = self._require_str('chat_topic')
-        asr_text_topic = self._require_str('asr_text_topic')
+        chat_topic = self._require_str('sub_chat_topic')
+        asr_text_topic = self._require_str('pub_asr_text_topic')
         self.provider = self._require_str('provider')
         self.encoder = self._require_str('encoder')
         self.decoder = self._require_str('decoder')
@@ -75,12 +75,18 @@ class AudioAsrNode(Node):
         self.rule3_min_utterance_length = self._require_float('rule3_min_utterance_length')
         self.target_device_idx = self._require_int('target_device_idx')
 
+        # 音频状态发布话题，用于通知底层
+        self.audio_status_topic = self._require_str('pub_audio_status_topic')
+
         self.pub_text = self.create_publisher(String, asr_text_topic, 10)
-        self.sub_chat = self.create_subscription(Bool, chat_topic, self._on_chat, 10)
+        self.pub_status = self.create_publisher(UInt8, self.audio_status_topic, 10)
+        self.sub_chat = self.create_subscription(UInt16, chat_topic, self._on_chat, 10)
 
         self._recognizing = False
         self._rec_thread = None
         self._chat_last = False
+        self.last_chat_val = 0
+        self.last_endpoint_time = 0
         self.get_logger().info('音频ASR节点已启动')
 
     def _require_str(self, name: str) -> str:
@@ -119,20 +125,16 @@ class AudioAsrNode(Node):
         self.get_logger().fatal(f"参数 '{name}' 类型不匹配，期望浮点数，实际为 {type(v).__name__}")
         raise RuntimeError(f"参数 '{name}' 类型不匹配")
 
-    def _on_chat(self, msg: Bool):
+    def _on_chat(self, msg: UInt16):
         """
         控制话题回调.
-
-        用途：
-        - 监听 Bool 控制开关；从 False->True 的沿触发一次识别启动。
-        参数：
-        - msg：Bool 消息，True 表示开始识别，False 表示关闭（等待端点）
         """
-        val = bool(msg.data)
-        # 如果上一帧为 False，当前帧为 True，且当前未在识别中，则启动识别
-        if not self._chat_last and val and not self._recognizing:
-            self._start_recognition()
-        self._chat_last = val
+        val = msg.data
+        if val != self.last_chat_val:
+            if val > self.last_chat_val:
+                self._start_recognition()
+            self.last_chat_val = val
+      
 
     def _start_recognition(self):
         """
@@ -319,13 +321,6 @@ class AudioAsrNode(Node):
                     # 关键逻辑修改：去重处理
                     # 只有当本次识别到的文本比上一次发布的文本更长，且以其为前缀时，才发布新增部分。
                     # 或者如果这是新的开始（has_sent_start=False），则直接发布。
-                    # 注意：流式ASR通常会输出不断变长的中间结果（如 "我", "我想", "我想你"）。
-                    # 下游 LLM 如果只是简单叠加，就会变成 "我我想我想你"。
-                    # 策略：不发布中间结果，只发布端点（整句）结果？或者发布全量但下游做去重？
-                    # 鉴于用户描述 LLM 是“连续监听话题，有内容就叠加”，那么 ASR 应该只发布“增量”内容，或者只在 END 时发布完整内容。
-                    # 但为了低延迟，我们应该发布增量。
-                    # 可是 sherpa-onnx 的 get_result 返回的是当前整句的完整识别结果。
-                    
                     # 解决方案：维护一个 last_published_text，计算增量。
                     if text:
                         # 如果是本句对话的第一个有效文本，先发送 START
@@ -342,10 +337,6 @@ class AudioAsrNode(Node):
                                 self._publish_text(new_content)
                                 self.last_published_text = text
                         else:
-                            # 这种情况比较少见（修正了之前的识别错误），全量发布新版本或者只发布差异？
-                            # 简单起见，如果发生了回溯修正，这里可能需要更复杂的逻辑。
-                            # 现在的简单策略：直接发布当前完整 text，但这样可能会导致重复。
-                            # 更稳妥的策略：流式ASR场景下，如果下游是叠加的，ASR最好只输出“稳定”的增量。
                             self.get_logger().debug(f"文本回溯/非前缀更新，忽略: '{text}' (Last: '{self.last_published_text}')")
                             pass 
                         
@@ -357,8 +348,12 @@ class AudioAsrNode(Node):
                         # 关键修改：一旦检测到端点，且之前发送过START（说明有有效语音），立即发送END
                         if has_sent_start:
                              self._publish_text("END")
+                             # 发送状态 1：ASR 识别结束
+                             self.pub_status.publish(UInt8(data=1))
+                             
                              has_sent_start = False # 重置标志，等待下一句话
                              self.last_published_text = "" # 重置去重缓存
+                             self.last_endpoint_time = time.time() # 记录本次对话结束时间
 
                         if not self._chat_last:
                             # 非连续模式：结束循环
@@ -375,6 +370,7 @@ class AudioAsrNode(Node):
         # 循环结束后的清理：如果因异常或其他原因退出循环，且处于未闭合状态，补发END
         if has_sent_start:
              self._publish_text("END")
+             self.pub_status.publish(UInt8(data=1))
              self.last_published_text = ""
 
 

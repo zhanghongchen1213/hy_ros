@@ -13,10 +13,10 @@ def generate_launch_description():
             parameters=[  # ROS2 要求为 list；内部为单个 dict 容器
                 {
                     # 订阅的 ASR 识别文本话题（输入），用于触发 LLM 推理
-                    'asr_text_topic': '/audio/asr_text',
+                    'sub_asr_text_topic': '/audio/asr_text',
                     
                     # LLM 推理结果发布话题（输出）
-                    'llm_result_topic': '/audio/llm_result',
+                    'pub_llm_result_topic': '/audio/llm_result',
 
                     # 语言模型文件路径 (.rkllm)
                     'llm_model_path': '/opt/rknn-llm/qwen3-vl-2b-instruct_w8a8_rk3588.rkllm',

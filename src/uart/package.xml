@@ -13,9 +13,10 @@
 
   <!-- START添加依赖库 -->
   <depend>python3-serial</depend>
-
-
+  <depend>pid_debug_interfaces</depend>
   <!-- END添加依赖库 -->
+
+  
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

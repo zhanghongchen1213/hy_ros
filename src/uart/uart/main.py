@@ -1,7 +1,8 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import UInt16, UInt8
+from std_msgs.msg import UInt16, UInt8, Float32
 from geometry_msgs.msg import Twist
+from pid_debug_interfaces.msg import MotorControl, MotorStatus
 import serial
 import threading
 import struct
@@ -21,13 +22,19 @@ class UartUplinkPacket(ctypes.LittleEndianStructure):
     _pack_ = 1
     _fields_ = [
         ("start_flag", ctypes.c_uint8),      # 0xAA
-        # 补充数据包
         ("chat_gpt_count", ctypes.c_uint16),
         
-        
-        
-        
-        
+        ("left_target_speed", ctypes.c_float),  # 左电机目标速度
+        ("right_target_speed", ctypes.c_float), # 右电机目标速度
+        ("left_actual_speed", ctypes.c_float),  # 左电机实际速度
+        ("right_actual_speed", ctypes.c_float), # 右电机实际速度
+        ("left_kp", ctypes.c_float),            # 左电机PID比例系数
+        ("left_ki", ctypes.c_float),            # 左电机PID积分系数
+        ("left_kd", ctypes.c_float),            # 左电机PID微分系数
+        ("right_kp", ctypes.c_float),           # 右电机PID比例系数
+        ("right_ki", ctypes.c_float),           # 右电机PID积分系数
+        ("right_kd", ctypes.c_float),           # 右电机PID微分系数
+
         ("timestamp", ctypes.c_uint32),
         ("end_flag", ctypes.c_uint8),        # 0x55
     ]
@@ -44,12 +51,23 @@ class UartDownlinkPacket(ctypes.LittleEndianStructure):
     _pack_ = 1
     _fields_ = [
         ("start_flag", ctypes.c_uint8),      # 0xAA
-        # 补充数据包
+        
         ("audio_stream_flag", ctypes.c_uint8), # 音频状态: 0=无, 1=ASR结束, 2=TTS结束, 3=HTTPS下发完成
-        
-        
-        
-        
+        ("left_target_speed", ctypes.c_float),  # 左电机目标速度
+        ("right_target_speed", ctypes.c_float), # 右电机目标速度
+        ("left_kp", ctypes.c_float),            # 左电机PID比例系数
+        ("left_ki", ctypes.c_float),            # 左电机PID积分系数
+        ("left_kd", ctypes.c_float),            # 左电机PID微分系数
+        ("right_kp", ctypes.c_float),           # 右电机PID比例系数
+        ("right_ki", ctypes.c_float),           # 右电机PID积分系数
+        ("right_kd", ctypes.c_float),           # 右电机PID微分系数
+
+        ("linear_vel", ctypes.c_float),
+        ("angular_vel", ctypes.c_float),
+        ("servo_a_angle", ctypes.c_float),
+        ("servo_b_angle", ctypes.c_float),
+        ("servo_c_angle", ctypes.c_float),
+
         ("timestamp", ctypes.c_uint32),        # 时间戳 (ms)
         ("end_flag", ctypes.c_uint8),        # 0x66
     ]
@@ -75,7 +93,9 @@ class UartNode(Node):
         self.port = self._require_str('port')
         self.baud = self._require_int('baud')
         self.chat_topic = self._require_str('pub_chat_topic')
+        self.motor_status_topic = self._require_str('pub_motor_status_topic')
         self.audio_status_topic = self._require_str('sub_audio_status_topic')
+        self.motor_control_topic = self._require_str('sub_motor_control_topic')
 
         # 2. 通信资源初始化
         self._ser = None
@@ -87,10 +107,13 @@ class UartNode(Node):
         # 3. ROS 接口
         # [Pub] 上行
         self.pub_chat = self.create_publisher(UInt16, self.chat_topic, 10)
+        self.pub_motor_status = self.create_publisher(MotorStatus, self.motor_status_topic, 10)
         
         # [Sub] 下行
         self.sub_audio_status = self.create_subscription(
             UInt8, self.audio_status_topic, self._on_audio_status, 10)
+        self.sub_motor_control = self.create_subscription(
+            MotorControl, self.motor_control_topic, self._on_motor_control, 10)
         
         # 4. 启动线程
         self._open()
@@ -115,6 +138,42 @@ class UartNode(Node):
         packet.end_flag = UartDownlinkPacket.END_FLAG
         
         self.send_queue.put(packet)
+
+    def _on_motor_control(self, msg: MotorControl):
+        """
+        ROS 回调：收到电机控制指令，组装下行包发送。
+        """
+        packet = UartDownlinkPacket()
+        packet.start_flag = UartDownlinkPacket.START_FLAG
+        packet.audio_stream_flag = 0 # 提供默认值即可
+        packet.left_target_speed = msg.left_target_speed
+        packet.right_target_speed = msg.right_target_speed
+        packet.left_kp = msg.left_kp
+        packet.left_ki = msg.left_ki
+        packet.left_kd = msg.left_kd
+        packet.right_kp = msg.right_kp
+        packet.right_ki = msg.right_ki
+        packet.right_kd = msg.right_kd
+        
+        packet.linear_vel = msg.linear_vel
+        packet.angular_vel = msg.angular_vel
+        packet.servo_a_angle = msg.servo_a_angle
+        packet.servo_b_angle = msg.servo_b_angle
+        packet.servo_c_angle = msg.servo_c_angle
+
+        packet.timestamp = int(time.time() * 1000) & 0xFFFFFFFF
+        packet.end_flag = UartDownlinkPacket.END_FLAG
+        
+        self.send_queue.put(packet)
+        
+        # 打印发送的电机控制指令
+        self.get_logger().info(f"发送电机控制指令: "
+                               f"左目标速度={packet.left_target_speed:.2f}, "
+                               f"右目标速度={packet.right_target_speed:.2f}, "
+                               f"左PID={packet.left_kp:.2f},{packet.left_ki:.2f},{packet.left_kd:.2f}, "
+                               f"右PID={packet.right_kp:.2f},{packet.right_ki:.2f},{packet.right_kd:.2f}, "
+                               f"线速度={packet.linear_vel:.2f}, 角速度={packet.angular_vel:.2f}, "
+                               f"舵机={packet.servo_a_angle:.2f},{packet.servo_b_angle:.2f},{packet.servo_c_angle:.2f}")
 
     def _open(self):
         with self._serial_lock:
@@ -212,9 +271,29 @@ class UartNode(Node):
                 # 发布话题
                 self.pub_chat.publish(UInt16(data=packet.chat_gpt_count))
                 
+                status_msg = MotorStatus()
+                status_msg.left_target_speed = packet.left_target_speed
+                status_msg.right_target_speed = packet.right_target_speed
+                status_msg.left_actual_speed = packet.left_actual_speed
+                status_msg.right_actual_speed = packet.right_actual_speed
+                status_msg.left_kp = packet.left_kp
+                status_msg.left_ki = packet.left_ki
+                status_msg.left_kd = packet.left_kd
+                status_msg.right_kp = packet.right_kp
+                status_msg.right_ki = packet.right_ki
+                status_msg.right_kd = packet.right_kd
+                self.pub_motor_status.publish(status_msg)
+                
                 self.get_logger().debug(
                     f"解析上行: Count={packet.chat_gpt_count}, TS={packet.timestamp}"
                 )
+                self.get_logger().debug(f"解析上行: 左目标速度={packet.left_target_speed:.2f}, "
+                                       f"右目标速度={packet.right_target_speed:.2f}, "
+                                       f"左实际速度={packet.left_actual_speed:.2f}, "
+                                       f"右实际速度={packet.right_actual_speed:.2f}, "
+                                       f"左PID={packet.left_kp:.2f},{packet.left_ki:.2f},{packet.left_kd:.2f}, "
+                                       f"右PID={packet.right_kp:.2f},{packet.right_ki:.2f},{packet.right_kd:.2f}")
+    
                 
                 # 4. 移除已解析的数据
                 del b[:packet_size]

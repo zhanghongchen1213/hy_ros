@@ -47,7 +47,7 @@ sudo apt-get install python3-aiohttp python3-websockets
 ---
 
 ```{figure} _static/{EE70FF84-01DA-4F41-B397-768A63B5CD34}.png
-:alt: Qwen2-VL 结果
+:alt: 语音复刻模型
 :width: 100%
 :align: center
 ```
@@ -55,7 +55,7 @@ sudo apt-get install python3-aiohttp python3-websockets
 ---
 
 ```{figure} _static/3AA2DD25-37C9-448F-9655-7A191EE35A87.png
-:alt: Qwen2-VL 结果
+:alt: 语音复刻模型测试
 :width: 100%
 :align: center
 ```

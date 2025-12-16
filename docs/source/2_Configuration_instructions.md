@@ -389,3 +389,9 @@ sudo apt-get install -y ros-humble-foxglove-bridge
 3. 选择 **"Foxglove WebSocket"** 协议。
 4. 输入端侧地址：`ws://192.168.22.219:8765` (IP 根据实际情况调整)。
 5. 连接成功后即可订阅和查看端侧的所有话题。
+
+```{figure} _static/{2BFCE0F0-25D7-44CC-A168-7EC55C00E17A}.png
+:alt: Foxglove 连接
+:width: 100%
+:align: center
+```

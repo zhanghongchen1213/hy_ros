@@ -1,5 +1,8 @@
 import rclpy
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from tf2_ros import TransformBroadcaster
+from geometry_msgs.msg import TransformStamped, Quaternion
 from std_msgs.msg import UInt16, UInt8, Float32
 from geometry_msgs.msg import Twist
 from pid_debug_interfaces.msg import MotorControl, MotorStatus
@@ -9,7 +12,7 @@ import struct
 import time
 import ctypes
 import queue
-
+import math
 
 # ==========================================
 # 数据包结构定义 (与 C 代码保持一致)
@@ -24,6 +27,7 @@ class UartUplinkPacket(ctypes.LittleEndianStructure):
         ("start_flag", ctypes.c_uint8),      # 0xAA
         ("chat_gpt_count", ctypes.c_uint16),
         
+        # --- 电机与PID状态 (调试用) ---
         ("left_target_speed", ctypes.c_float),  # 左电机目标速度
         ("right_target_speed", ctypes.c_float), # 右电机目标速度
         ("left_actual_speed", ctypes.c_float),  # 左电机实际速度
@@ -34,6 +38,21 @@ class UartUplinkPacket(ctypes.LittleEndianStructure):
         ("right_kp", ctypes.c_float),           # 右电机PID比例系数
         ("right_ki", ctypes.c_float),           # 右电机PID积分系数
         ("right_kd", ctypes.c_float),           # 右电机PID微分系数
+
+        # --- 里程计与姿态 (用于SLAM/Nav/RVIZ) ---
+        ("position_x", ctypes.c_float),  # 位置 X (mm)
+        ("position_y", ctypes.c_float),  # 位置 Y (mm)
+
+        # 姿态四元数 (用于数字孪生)
+        ("q_w", ctypes.c_float),
+        ("q_x", ctypes.c_float),
+        ("q_y", ctypes.c_float),
+        ("q_z", ctypes.c_float),
+
+        # --- 关节状态 (用于Joint State) ---
+        ("servo_a_angle", ctypes.c_int16), 
+        ("servo_b_angle", ctypes.c_int16),
+        ("servo_c_angle", ctypes.c_int16),
 
         ("timestamp", ctypes.c_uint32),
         ("end_flag", ctypes.c_uint8),        # 0x55
@@ -62,11 +81,11 @@ class UartDownlinkPacket(ctypes.LittleEndianStructure):
         ("right_ki", ctypes.c_float),           # 右电机PID积分系数
         ("right_kd", ctypes.c_float),           # 右电机PID微分系数
 
-        ("linear_vel", ctypes.c_float),
-        ("angular_vel", ctypes.c_float),
-        ("servo_a_angle", ctypes.c_float),
-        ("servo_b_angle", ctypes.c_float),
-        ("servo_c_angle", ctypes.c_float),
+        ("linear_vel", ctypes.c_float),         # 线速度 (m/s)
+        ("angular_vel", ctypes.c_float),        # 角速度 (rad/s)
+        ("servo_a_angle", ctypes.c_float),      # 舵机A角度 (rad)
+        ("servo_b_angle", ctypes.c_float),      # 舵机B角度 (rad)
+        ("servo_c_angle", ctypes.c_float),      # 舵机C角度 (rad)
 
         ("timestamp", ctypes.c_uint32),        # 时间戳 (ms)
         ("end_flag", ctypes.c_uint8),        # 0x66
@@ -108,6 +127,8 @@ class UartNode(Node):
         # [Pub] 上行
         self.pub_chat = self.create_publisher(UInt16, self.chat_topic, 10)
         self.pub_motor_status = self.create_publisher(MotorStatus, self.motor_status_topic, 10)
+        self.pub_joint_state = self.create_publisher(JointState, 'joint_states', 10)
+        self.tf_broadcaster = TransformBroadcaster(self)
         
         # [Sub] 下行
         self.sub_audio_status = self.create_subscription(
@@ -284,6 +305,38 @@ class UartNode(Node):
                 status_msg.right_kd = packet.right_kd
                 self.pub_motor_status.publish(status_msg)
                 
+                # 2. 发布 JointState (关节状态)
+                joint_msg = JointState()
+                joint_msg.header.stamp = self.get_clock().now().to_msg()
+                joint_msg.name = ['right_arm_joint', 'left_arm_joint', 'spine_joint'] 
+                # int16=30 -> 30度 -> 30 * (PI/180) rad
+                scale = math.pi / 180.0
+                joint_msg.position = [
+                    float(packet.servo_a_angle) * scale,
+                    float(packet.servo_b_angle) * scale,
+                    float(packet.servo_c_angle) * scale
+                ]
+                self.pub_joint_state.publish(joint_msg)
+
+                # 3. 发布 TF (里程计与姿态)
+                t = TransformStamped()
+                t.header.stamp = self.get_clock().now().to_msg()
+                t.header.frame_id = 'odom'
+                t.child_frame_id = 'base_link'
+                
+                # 位置 (mm -> m)
+                t.transform.translation.x = float(packet.position_x) / 1000.0
+                t.transform.translation.y = float(packet.position_y) / 1000.0
+                t.transform.translation.z = 0.0
+                
+                # 姿态 (四元数)
+                t.transform.rotation.w = float(packet.q_w)
+                t.transform.rotation.x = float(packet.q_x)
+                t.transform.rotation.y = float(packet.q_y)
+                t.transform.rotation.z = -float(packet.q_z)
+                
+                self.tf_broadcaster.sendTransform(t)
+
                 self.get_logger().debug(
                     f"解析上行: Count={packet.chat_gpt_count}, TS={packet.timestamp}"
                 )

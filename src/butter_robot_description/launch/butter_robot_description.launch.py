@@ -49,15 +49,4 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time, 'robot_description': robot_desc}],
             # 参数列表（通常不需要显式传入文件路径，上面的 robot_description 参数已足够）
             arguments=[urdf_path]),
-            
-        # 启动 joint_state_publisher 节点
-        # 该节点会读取 URDF 中的非固定关节，并发布默认的关节状态 (0.0)
-        # 这对于没有真实电机反馈的调试阶段非常重要，它确保了 TF 树的完整性
-        Node(
-            package='joint_state_publisher',
-            executable='joint_state_publisher',
-            name='joint_state_publisher',
-            parameters=[{'use_sim_time': use_sim_time}],
-            arguments=[urdf_path]
-        ),
     ])

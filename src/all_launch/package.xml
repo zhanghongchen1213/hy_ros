@@ -16,6 +16,7 @@
   <exec_depend>audio_asr</exec_depend>
   <exec_depend>audio_rkllm</exec_depend>
   <exec_depend>audio_tts</exec_depend>
+  <exec_depend>butter_robot_description</exec_depend>
   <!-- END添加所有需要的launch文件的依赖 -->
 
   <test_depend>ament_copyright</test_depend>

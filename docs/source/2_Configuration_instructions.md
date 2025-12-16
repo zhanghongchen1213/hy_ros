@@ -371,14 +371,21 @@ sudo apt-get install libopencv-dev python3-opencv # 安装 OpenCV 库
 sudo apt-get install python3-aiohttp python3-websockets
 ```
 
-- 首先分析图片中的报错信息，然后中文输出报错信息，其次提供你认为报错的原因，最后给出你的解决方案并调整代码。不需要你直接在终端测试，因为你现在的环境是本机环境，与端侧环境无关，我会在端侧自行验证并给你提供反馈，咱们一起协同快速开发。
+## 三、Foxglove 配置
 
-<image>介绍一下图片里的人物形象，年龄背景，人物特征
+### 3.1 端侧部署 (RK3588S)
 
-- 现在该功能包需要完成以下内容： 1.监听来自/audio/llm_result 话题的流式文本消息。 2.实现异步 Websocket 调用百度流式 TTS API，将接收的流式文本消息通过调用 API 转为音频流。 3.实现轻量异步 HTTPS 服务器，接受到 API 返回的音频流开启对外提供音频下载 / 下发接口
+Foxglove Bridge 用于将 ROS 2 话题通过 WebSocket 转发给 Foxglove Studio。
 
+```bash
+sudo apt-get install -y ros-humble-joint-state-publisher
+sudo apt-get install -y ros-humble-foxglove-bridge
+```
 
-1. 驱动通过串口上报离线语音识别指令“跟我聊天”。如果上一次是 false，本次是 true。此时上报为 true。如果是连续 flase，或者连续 true，都上报为 false。
-2. 串口解析该指令，触发 ASR 启动。在 END 结束后，直到收到“已经完成”指令，才会继续监听串口发布的话题。
-3. ASR 启动后，执行流程，下发音频。等待下发完成后，通过串口下发“已经完成”的指令
-4. 驱动分析“已经完成”指令，判断是否需要继续监听 ASR 结果
+### 3.2 上位机连接 (PC/iPad)
+
+1. 打开 [Foxglove Studio](https://foxglove.dev/) (网页版或客户端)。
+2. 点击 **"Open Connection"**。
+3. 选择 **"Foxglove WebSocket"** 协议。
+4. 输入端侧地址：`ws://192.168.22.219:8765` (IP 根据实际情况调整)。
+5. 连接成功后即可订阅和查看端侧的所有话题。

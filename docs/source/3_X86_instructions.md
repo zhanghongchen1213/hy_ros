@@ -59,18 +59,3 @@ sudo apt-get install python3-aiohttp python3-websockets
 :width: 100%
 :align: center
 ```
-
-### 2.2 Foxglove Studio 可视化配置
-
-```shell
-# 安装 Foxglove Studio
-sudo snap install foxglove-studio
-sudo apt install ros-$ROS_DISTRO-foxglove-bridge
-
-# 启动 Foxglove Studio
-ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765
-foxglove-studio
-
-# 安装 xterm 终端
-sudo apt-get install xterm
-```

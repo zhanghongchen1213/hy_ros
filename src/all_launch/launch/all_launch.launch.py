@@ -4,6 +4,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
 import os
 
+from launch_ros.actions import Node
 
 def generate_launch_description():
     # 1. uart 节点
@@ -21,6 +22,10 @@ def generate_launch_description():
     # # 4. audio_tts 节点
     # audio_tts_share = get_package_share_directory('audio_tts')
     # audio_tts_launch = os.path.join(audio_tts_share, 'launch', 'audio_tts.launch.py')
+    
+    # 5. butter_robot_description 节点
+    butter_robot_description_share = get_package_share_directory('butter_robot_description')
+    butter_robot_description_launch = os.path.join(butter_robot_description_share, 'launch', 'butter_robot_description.launch.py')
 
 
     return LaunchDescription([
@@ -43,4 +48,25 @@ def generate_launch_description():
         # IncludeLaunchDescription(
         #     PythonLaunchDescriptionSource(audio_tts_launch)
         # ),
+        
+        # 5. butter_robot_description 节点
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(butter_robot_description_launch)
+        ),
+
+        # 5. foxglove_bridge 节点 (端口: 8765)
+        Node(
+            package='foxglove_bridge',
+            executable='foxglove_bridge',
+            name='foxglove_bridge',
+            parameters=[
+                {'port': 8765},
+                {'address': '0.0.0.0'},
+                {'tls': False},
+                {'send_buffer_limit': 10000000},
+                {'use_compression': True},
+                {'capabilities': ['clientPublish', 'parameters', 'parametersSubscribe', 'services', 'connectionGraph', 'assets']},
+                {'asset_uri_allowlist': ['^package://(?:[-\\w]+/)*[-\\w]+\\.(?:dae|fbx|glb|gltf|jpeg|jpg|mtl|obj|png|stl|tif|tiff|urdf|webp|xacro)$']}
+            ]
+        ),
     ])

@@ -7,15 +7,27 @@
    :caption: 产品简介
    
    1_product_introduction
-   
-.. toctree::
-   :maxdepth: 1
-   :caption: 端侧配置说明
-   
-   2_Configuration_instructions
 
 .. toctree::
    :maxdepth: 1
-   :caption: X86配置说明
+   :caption: 开机使用
    
-   3_X86_instructions
+   2_Startup_instructions
+   
+.. toctree::
+   :maxdepth: 1
+   :caption: 开发教程
+   
+   3_Development_instructions
+
+.. toctree::
+   :maxdepth: 1
+   :caption: 技术原理
+   
+   4_Technical_principles
+
+.. toctree::
+   :maxdepth: 1
+   :caption: DIY组装说明
+   
+   5_Assembly_instructions

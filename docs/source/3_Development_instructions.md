@@ -264,7 +264,7 @@ sudo orangepi-config
 # 依次选择System->Hardware -> uart3-m2 -> Space开启 -> save -> back -> Reboot
 ```
 
-# 三、语音模型调试
+# 三、语音模型部署
 
 ## 1. 部署 Sherpa-ONNX-RKNPU 流式 ASR 模型
 
@@ -511,10 +511,18 @@ sudo apt-get install -y ros-humble-foxglove-bridge
 
 ## 1. 数据集准备
 
-1. 运行 `tools/capture_tool.py` 采集数据集, 采集到的图像会保存到 `source/butter_img` 目录下。（建议采集 100 张以上图像）
-2. 使用 [https://app.roboflow.com](https://app.roboflow.com) 平台实现数据集标注和管理，
+1. 运行 `tools/capture_tool.py` 采集数据集, 采集到的图像会保存到 `source/butter_img` 目录下。（建议采集 300 张以上图像）
+2. 使用 [roboflow](https://app.roboflow.com) 平台实现数据集标注和管理，
+
+> - 本次训练使用 60%网络数据集 + 40%个人自定义数据集[butter_robot_dataset](https://universe.roboflow.com/butter-robot/butter_robot)，可自行下载删除修改
 
 > ```{figure} _static/{5F43021B-F98A-4638-9F1C-1A0F37A3776A}.png
+> :alt: 数据集标注
+> :width: 100%
+> :align: center
+> ```
+
+> ```{figure} _static/{C8DC5ACD-2155-4C45-84B2-37633DD7952A}.png
 > :alt: 数据集标注
 > :width: 100%
 > :align: center
@@ -527,12 +535,11 @@ sudo apt-get install -y ros-humble-foxglove-bridge
 > ```
 
 3. 数据集预处理包括数据增强、数据划分，下载 yolov8 数据集配置文件
-
-> ```{figure} _static/{F60B123F-AA37-4341-8C82-F983E41C8873}.png
-> :alt: 数据集预处理
-> :width: 100%
-> :align: center
-> ```
+   > ```{figure} _static/{127BE14A-6CA8-428D-BD75-6139993EC29B}.png
+   > :alt: 数据集预处理
+   > :width: 100%
+   > :align: center
+   > ```
 
 ## 2. Win 环境实现模型训练
 
@@ -546,7 +553,7 @@ pip3 install uv
 # 查看python版本
 uv python list
 # 选择python版本创建虚拟环境项目
-uv init -p 3.13.2 butter_train_env
+uv init -p 3.12 butter_train_env
 cd butter_train_env
 ```
 
@@ -554,6 +561,7 @@ cd butter_train_env
 
 ```powershell
 uv add pandas  # 安装pandas库
+uv add onnxscript  # 安装onnxscript库，用于转换模型
 uv add --dev ipykernel  # 安装ipykernel库，用于在Jupyter中选择项目内核
 ```
 
@@ -605,9 +613,55 @@ uv add --dev ipykernel  # 安装ipykernel库，用于在Jupyter中选择项目�
 ### 2.3 安装 ultralytics
 
 - 安装 ultralytics 库，测试 yolov8n 预训练参数是否成功加载到 GPU
+  **注意**：必须使用 ultralytics rknn 修改版才能正确导出 RKNN 模型，且依然可以通过 UV 进行管理
 
 ```shell
-uv add ultralytics  # 安装ultralytics库
+# 安装适配 RKNN 的 ultralytics 库（airockchip 维护版本）
+# 注意：必须使用此修改版才能正确导出 RKNN 模型，且依然可以通过 UV 进行管理
+uv add git+https://github.com/airockchip/ultralytics_yolov8.git
+```
+
+- pyproject.toml 配置文件可参考如下：
+
+```yaml
+# UV配置文件仅供参考，实际使用时请根据自己的环境进行修改
+[project]
+name = "butter-train-env"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "onnxscript>=0.5.0",
+    "pandas>=2.3.3",
+    "tensorboard>=2.20.0",
+    "torch==2.5.1",
+    "torchaudio==2.5.1",
+    "torchvision==0.20.1",
+    "ultralytics",
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchaudio = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+ultralytics = { git = "https://github.com/airockchip/ultralytics_yolov8.git" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]
 ```
 
 ```python
@@ -633,28 +687,333 @@ print("YOLOv8n已加载到GPU：", next(model.model.parameters()).is_cuda)
 :align: center
 ```
 
+### 2.4 yolov8n 模型训练和转换
+
 ```python
 # 开始训练
+# 开始训练
+# data: 数据集配置文件路径 (使用绝对路径避免错误)
+# epochs: 训练轮数
+# imgsz: 输入图像大小
+# batch: 批次大小
+# device: 训练设备 (0 表示使用第一块 GPU)
 results = model.train(
-    data="C:/Users/Administrator/Desktop/butter_yolov8n_train/butter_robot.yolov8/data.yaml",   #替换为下载的数据集配置文件路径
-    epochs=100, # 训练轮数
-    imgsz=640,  # 输入图像大小
-    batch=16,   # 批次大小
-    device=0,   # 使用默认GPU训练
-    project="butter_train_results",  # 训练结果保存目录
-    name="yolov8n_butter",  # 训练结果子目录名称
-    exist_ok=True  # 允许覆盖已存在的目录
+    data="C:/Users/Administrator/Desktop/butter_yolov8n_train/Dataset/data.yaml",
+    epochs=120,
+    imgsz=640,
+    batch=32,
+    device=0,
+    project="butter_train_results",
+    name="yolov8n_butter",
+    exist_ok=True,  # 允许覆盖同名目录，方便调试
+    verbose=True,  # 显示详细训练日志
 )
 ```
 
+```shell
+# 启动 tensorboard 可视化训练过程
+cd butter_train_env
+uv run tensorboard --logdir ../butter_train_results/yolov8n_butter --port 6006
+```
+
+|        数据类别         | 指标 / 损失名称 | 最终数值 | 单位 | 备注                          |
+| :---------------------: | :-------------: | :------: | :--: | :---------------------------- |
+|  **Metrics 检测指标**   |    mAP50(B)     |  92.56%  |  -   | IoU≥0.5 时的平均精度          |
+|                         |   mAP50-95(B)   |  75.70%  |  -   | IoU 从 0.5 到 0.95 的平均精度 |
+|                         |  Precision(B)   |  89.25%  |  -   | 预测为黄油的精准度            |
+|                         |    Recall(B)    |  87.58%  |  -   | 实际黄油的召回率              |
+| **训练集（Train）损失** |    box_loss     |  0.2732  |  -   | 预测框位置损失                |
+|                         |    cls_loss     |  0.1944  |  -   | 黄油类别预测损失              |
+|                         |    dfl_loss     |  0.8377  |  -   | 框分布拟合损失                |
+|  **验证集（Val）损失**  |    box_loss     |  0.7615  |  -   | 预测框位置损失                |
+|                         |    cls_loss     |  0.7156  |  -   | 黄油类别预测损失              |
+|                         |    dfl_loss     |  1.3528  |  -   | 框分布拟合损失                |
+
+```{figure} _static/{BDB92C54-2B97-47F6-B043-25904817570B}.png
+:alt: 训练结果
+:width: 100%
+:align: center
+```
+
+```{figure} _static/{58DE5FE2-0846-4786-B6A4-96277B7DCC74}.png
+:alt: 训练结果
+:width: 100%
+:align: center
+```
+
+---
+
+```python
+from ultralytics import YOLO
+# 1. 加载训练好的最佳权重文件
+model_path = "butter_train_results/yolov8n_butter/weights/best.pt"
+model = YOLO(model_path)
+# 2. 导出为 RKNN 兼容的 ONNX 模型
+# 关键参数说明：
+# format='rknn': 指定导出格式为 rknn (实际上会先导出为特殊的 onnx)
+success = model.export(format="rknn")
+print(f"导出完成: {success}")
+```
+
+---
+
+**注意**：必须使用 ultralytics rknn 修改版才能正确导出 RKNN 模型，，导出的模型必须是唯一的.onnx 文件。
+
+---
+
+```{figure} _static/{8E78FC5C-2C5B-4F74-8142-60A877F1DF2C}.png
+:alt: 转换结果
+:width: 100%
+:align: center
+```
+
+---
+
 ## 3. Ubuntu 环境实现模型转换
 
-### 3.1 安装 RKNN-Toolkit2
+### 3.1 docker 安装 RKNN-Toolkit2
+
+因为在宿主机配置 RKNN-Toolkit2 环境，极易出错，所以建议在 Ubuntu 环境下使用 Docker 容器来运行 RKNN-Toolkit2。
+
+1. 下载并安装 Docker
+
+```shell
+# 1. 安装Docker并配置自启
+sudo apt update -y
+
+# 安装apt依赖工具（允许HTTPS访问仓库、解压缩等）
+sudo apt install -y ca-certificates curl gnupg lsb-release git
+
+# 创建密钥存储目录
+sudo mkdir -p /etc/apt/trusted.gpg.d
+
+# 下载并添加Docker官方GPG密钥（使用阿里云镜像修复SSL连接问题）
+curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg
+
+# 配置Docker仓库源（使用阿里云镜像加速）
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/trusted.gpg.d/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 更新软件包索引
+sudo apt update
+
+#  安装Docker核心组件（engine+cli+containerd）
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+
+# 启动Docker服务（若未自动启动）
+sudo systemctl start docker
+
+# 设置Docker开机自启
+sudo systemctl enable docker
+
+# 配置 Docker 镜像加速（解决拉取镜像失败/速度慢的问题）
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://huecker.io"
+  ]
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+# 验证Docker是否正常运行（输出"Hello from Docker!"即成功）
+sudo docker run --rm hello-world
+
+# 将当前用户添加到docker组
+sudo usermod -aG docker $USER
+
+# 刷新组权限（无需重启，立即生效）
+newgrp docker
+
+# 验证：无需sudo执行docker命令
+docker ps
+```
+
+```{figure} _static/{92D8EF11-C785-472C-A49D-47279682B9BF}.png
+:alt: 安装docker并配置自启
+:width: 100%
+:align: center
+```
+
+---
+
+2. 下载 rknn-toolkit2 的 Dockerfile
+
+```shell
+# 1. 下载 rknn-toolkit2 的 Dockerfile
+# 创建目录并进入
+sudo mkdir -p /opt/rknn-toolkit2/tools-file
+cd /opt/rknn-toolkit2/tools-file
+
+# 克隆仓库（使用 Gitee 镜像加速下载）
+sudo git clone https://gitee.com/cddssgl/rknn-toolkit2.git
+cd rknn-toolkit2/rknn-toolkit2/docker/docker_file/ubuntu_20_04_cp38
+
+# 2. 修改 Dockerfile 源（解决 pip 安装依赖失败问题）
+# 将默认的不稳定源替换为阿里云镜像源，否则会因为网络问题导致安装失败
+sudo sed -i 's|mirror.baidu.com|mirrors.aliyun.com|g' Dockerfile_ubuntu_20_04_for_cp38
+
+# 3.构建命令说明：
+# -f：指定 Dockerfile 路径（必须显式指定，否则会找默认的 Dockerfile）
+# -t：给镜像打标签（格式：名称:版本，这里用 rknn-toolkit2:cp38-2.3.2 明确标识 Python 版本和工具包版本）
+# .：构建上下文（当前目录，Docker 会读取目录内的 whl 包和源配置文件）
+# 注意：若未配置 docker 用户组权限，需加 sudo
+sudo docker build -f Dockerfile_ubuntu_20_04_for_cp38 -t rknn-toolkit2:cp38-2.3.2 .
+
+# 4. 验证镜像是否构建成功
+sudo docker images | grep rknn-toolkit2:cp38-2.3.2
+```
+
+```{figure} _static/{C80D900A-898E-466E-B327-BF181D720242}.png
+:alt: 构建rknn-toolkit2镜像
+:width: 100%
+:align: center
+```
+
+---
+
+3. 挂载启动 docker 容器
+
+```shell
+# 1.先创建本地工作目录（用于存放 RK 模型、测试脚本、输出结果）
+sudo mkdir -p /opt/rknn-toolkit2/workspace
+cd /opt/rknn-toolkit2/workspace
+
+# 2.启动命令（挂载本地目录+映射 8888 端口）
+# 本地目录 ~/rknn_workspace 挂载到容器的 /root/workspace（双向同步）
+# 本地 8888 端口映射到容器 8888 端口（用于运行 Jupyter Notebook）
+# 容器名称
+# 启动后进入 bash 终端
+sudo docker run -it --privileged --rm \
+  -v /opt/rknn-toolkit2/workspace:/root/workspace \
+  -p 8888:8888 \
+  --name rknn-cp38-container \
+  rknn-toolkit2:cp38-2.3.2 /bin/bash
+
+# 3.进入容器后执行以下命令
+# 检查 Python 版本（应为 3.8.x）
+python3 --version
+
+# 导入 RKNN 模块（无报错即成功）
+python3 -c "from rknn.api import RKNN; print('RKNN 导入成功！版本：2.3.2')"
+```
+
+```{figure} _static/{226E9997-8106-4E75-8877-A5CE700F1E8E}.png
+:alt: 挂载启动rknn-toolkit2容器
+:width: 100%
+:align: center
+```
+
+4. 常用容器管理命令
+
+```shell
+# 1. 列出运行中的容器
+docker ps
+
+# 2. 停止容器（替换为容器名称/ID）
+docker stop rknn-cp38-container
+
+# 3. 重新启动已停止的容器
+docker start rknn-cp38-container
+
+# 4. 进入已运行的容器（再次打开终端）
+docker exec -it rknn-cp38-container /bin/bash
+
+# 5. 删除镜像（无需使用时清理磁盘空间）
+docker rmi rknn-toolkit2:cp38-2.3.2
+```
 
 ### 3.2 转换模型
 
-### 3.3 仿真推理
+**注意**：此时环境为 Ubuntu 主机环境，容器只是用于执行转换脚本，所有模型文件挂载在主机目录下/opt/rknn-toolkit2/workspace 中。
 
-### 3.4 ADB 端侧 NPU 推理
+```shell
+# 1. 克隆 rknn_model_zoo 仓库，使用脚本文件转换模型
+cd /opt/rknn-toolkit2/workspace
+sudo git clone https://gitee.com/airockchip/rknn_model_zoo.git
 
-### 3.5 交叉编译验证
+cd rknn_model_zoo/examples/yolov8/python
+
+# 2. 上传模型文件和黄油图片到ubuntu目录
+chmod +x best.onnx
+sudo cp best.onnx /opt/rknn-toolkit2/workspace/rknn_model_zoo/examples/yolov8/python/
+```
+
+**注意**：下面环境为 rknn-toolkit2:cp38-2.3.2 容器内，需要在容器内执行转换脚本。
+
+```shell
+# 1. 若未启动docker容器，挂载启动 rknn-toolkit2 容器
+#sudo docker run -it --privileged --rm \
+#  -v /opt/rknn-toolkit2/workspace:/root/workspace \
+#  -p 8888:8888 \
+#  --name rknn-cp38-container \
+#  rknn-toolkit2:cp38-2.3.2 /bin/bash
+
+cd /root/workspace/rknn_model_zoo/examples/yolov8/python
+# pip uninstall onnx  # (可选)：可能会因为onnx版本过高导致转换失败
+# pip install "onnx==1.14.1" # (可选)：可能会因为onnx版本过高导致转换失败
+python convert.py best.onnx rk3588
+
+# 转换完成后，将模型文件复制到主机目录下
+cd /root/workspace/rknn_model_zoo/examples/yolov8/model
+sudo cp yolov8n.rknn /home/k/
+```
+
+```{figure} _static/{E8C4C09B-7AEC-407D-9658-738C793B8E71}.png
+:alt: 转换yolov8n模型
+:width: 100%
+:align: center
+```
+
+```{figure} _static/{F306641D-A9F8-4632-BDBD-72B502CCAAA6}.png
+:alt: 转换完成的模型位置
+:width: 100%
+:align: center
+```
+
+## 4. 端侧测试
+
+**注意**：下面环境为端侧环境，使用 RKNN-Toolkit-Lite2 python 接口测试模型。
+
+```shell
+# 1. 安装 RKNN-Toolkit-Lite2 python 包
+pip3 install rknn-toolkit-lite2
+
+# 2. 测试是否安装成功
+python3 -c "from rknnlite.api import RKNNLite; print('RKNNLite 导入成功！版本：2.3.2')"
+
+# 2. 上传模型文件和测试图片到端侧目录
+mkdir -p /opt/rknn-toolkit2-lite
+cd /opt/rknn-toolkit2-lite
+
+cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/yolov8.rknn /opt/rknn-toolkit2-lite/
+cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/butter.jpg /opt/rknn-toolkit2-lite/
+cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/test.py /opt/rknn-toolkit2-lite/
+
+# 3. 运行测试脚本
+python test.py
+```
+
+- 测试结果图片
+
+## 5. 人手跟随(拓展)
+
+### 5.1 基本原理
+
+### 5.2 模型部署
+
+# 六、yolov8n 目标检测部署
+
+## 1. GStreamer 部署
+
+## 2. RKNN-NPU 部署
+
+## 3. RTSP 推流
+
+# 七、SLAM 部署
+
+# 八、Nav2 部署

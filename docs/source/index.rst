@@ -31,3 +31,9 @@
    :caption: DIY组装说明
    
    5_Assembly_instructions
+
+.. toctree::
+   :maxdepth: 1
+   :caption: 参考链接
+   
+   6_Reference_links

@@ -1014,7 +1014,105 @@ python3 test.py
 
 # 六、yolov8n 目标检测部署
 
-## 1. GStreamer 部署
+## 1. 目标检测、推流全硬件加速
+
+### 1.1 基本原理
+
+整个 **rk_camera** 到 **rk_inference** 再到 **rk_streamer** 的流程设计，充分利用了 RK3588S 的异构计算架构（ISP、RGA、NPU、VPU），实现了端到端的低延迟和高效处理。利用 ROS2 的组件设计，使用 UniquePtr 实现多个节点之间的零拷贝数据传输，避免了 CPU 拷贝带来的性能损失，可大幅提升系统吞吐量。
+
+**节点 1: rk_camera (采集)**
+
+| **流程描述**       | **关键代码 / 工具**          | **触发的硬件** | **硬件功能**                                                                                                                                        |
+| ------------------ | ---------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **GStreamer 抓取** | v4l2src (GStreamer 插件)     | **ISP**        | 摄像头传感器进来的数据是 Raw 格式，**ISP** 硬件自动将其去噪、白平衡、去马赛克，输出 NV12 数据。                                                     |
+| **数据传输**       | 内核驱动层 (V4L2 Driver)     | **DMA**        | **DMA** 硬件悄悄地把 ISP 处理好的数据搬运到内存（RAM）中，CPU 此时在休息。                                                                          |
+| **拷贝到 ROS msg** | memcpy (C++ 标准库)          | **CPU**        | **这里是唯一的 CPU 重活**。CPU 把 GStreamer 的 Buffer 里的数据拷贝到 ROS 消息的 std::vector 中。（注：这是为了生成 ROS 消息，后续传输才是零拷贝）。 |
+| **发布消息**       | pub->publish(std::move(msg)) | **(无)**       | 这是一个软件行为。std::move 转移了指针所有权，**避免了** CPU 进行节点间的数据拷贝。                                                                 |
+
+**节点 2: rk_inference (推理与绘图 —— 核心)**
+
+| **流程描述**        | **关键代码 / 工具**                              | **触发的硬件** | **硬件在做什么？**                                                                                                                           |
+| ------------------- | ------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **准备 Buffer**     | wrapbuffer_virtualaddr(...)                      | **(无)**       | 纯软件动作。只是告诉 RGA 驱动：“数据在这个内存地址，你记一下”。                                                                              |
+| **缩放 + 格式转换** | **imresize(src, dst)** 或 imcvtcolor (librga 库) | **RGA**        | **核心触发点！** 这行代码向 RGA 寄存器发送指令。**RGA 硬件**启动，瞬间把 1080P NV12 读入，处理成 640x640 RGB，写回内存。CPU 等待或做别的事。 |
+| **NPU 推理**        | **rknn_run(ctx, ...)** (rknn_api 库)             | **NPU**        | **核心触发点！** 这行代码唤醒 **NPU 硬件**。NPU 加载模型权重，对 640x640 的数据进行数万亿次矩阵运算。                                        |
+| **后处理**          | if (conf > 0.5) ... (C++ 逻辑)                   | **CPU**        | 解析 NPU 输出的浮点数，计算坐标 (x,y,w,h)。这是简单的逻辑判断，CPU 做这个很快。                                                              |
+| **RGA 绘图**        | **imdrawrect(src, rect, ...)** (librga 库)       | **RGA**        | **核心触发点！** 代码告诉 **RGA 硬件**：“在 src 这个 NV12 图片的 (x,y) 位置，把像素值改成红色”。RGA 直接修改内存，不用 CPU 逐个像素去画。    |
+| **发布**            | pub->publish(std::move(msg))                     | **(无)**       | 指针传递，零拷贝。                                                                                                                           |
+
+**节点 3: rk_streamer (推流)**
+
+| **流程描述** | **关键代码 / 工具**                    | **触发的硬件**   | **硬件在做什么？**                                                                                                                                      |
+| ------------ | -------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **写入管道** | writer.write(image) (OpenCV) -> appsrc | **CPU/DMA**      | 数据进入 GStreamer 的管道系统。                                                                                                                         |
+| **硬件编码** | Pipeline 字符串中的 **mpph264enc**     | **VPU (RKVENC)** | **核心触发点！** mpph264enc 插件调用 MPP 库，MPP 库驱动 **VPU 硬件**。VPU 读取 NV12 原始数据，根据 H.264 算法进行帧内预测、运动估计，输出压缩后的码流。 |
+| **网络发送** | rtspclientsink                         | **CPU/网卡**     | CPU 将压缩好的小数据包通过网络协议栈发给网卡。                                                                                                          |
+
+### 1.2 端侧依赖安装
+
+在 RK3588S 端侧（Ubuntu 系统）上，需要安装以下基础库：
+
+```bash
+# 1. 安装 GStreamer 及其插件（包含 app 库）
+# 从清华镜像源安装 GStreamer 及其插件
+sudo sed -i 's/mirrors.tuna.tsinghua.edu.cn/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+sudo apt-get update
+
+# 安装 GStreamer 及其插件（包含 app 库）
+sudo apt-get install -y --fix-missing libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+    gstreamer1.0-tools
+
+# 2. 安装 ROS2 依赖
+sudo apt-get install -y ros-humble-image-transport ros-humble-cv-bridge
+
+# 3. 安装 RTSP 推流服务器 (go2rtc)
+# go2rtc 是一个轻量级、零依赖的流媒体服务器，支持 RTSP/WebRTC/HLS 等多种协议
+# 建议直接下载二进制文件到 /usr/local/bin
+wget https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_arm64 -O /usr/local/bin/go2rtc
+chmod +x /usr/local/bin/go2rtc
+
+# 4. 配置与自启动，配合foxglove实现推流视频可视化
+# 4.1 创建配置文件 /etc/go2rtc.yaml
+# 使用以下命令创建最小化配置，开启 RTSP 和 WebRTC
+sudo bash -c 'cat <<EOF > /etc/go2rtc.yaml
+streams:
+  # 定义一个名为 "camera" 的流，来源可以是 RTSP, HTTP-FLV, 甚至是 exec 命令
+  # 这里我们预留接口，稍后 rk_streamer 节点会将流推送到 rtsp://127.0.0.1:8554/camera
+  camera: rtsp://127.0.0.1:8554/camera
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555"
+  candidates:
+    - 192.168.22.219:8555 # 请修改为你的板卡实际 IP
+EOF'
+
+# 4.2 设置go2rtc开机自启动 (Systemd 服务)
+sudo bash -c 'cat <<EOF > /etc/systemd/system/go2rtc.service
+[Unit]
+Description=Go2RTC Media Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/go2rtc -c /etc/go2rtc.yaml
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+
+# 启用并启动服务
+sudo systemctl daemon-reload
+sudo systemctl enable go2rtc
+sudo systemctl start go2rtc
+```
+
+## 2. RKNN-NPU 部署
 
 ## 2. RKNN-NPU 部署
 

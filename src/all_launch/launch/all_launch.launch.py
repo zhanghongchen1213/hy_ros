@@ -27,6 +27,9 @@ def generate_launch_description():
     butter_robot_description_share = get_package_share_directory('butter_robot_description')
     butter_robot_description_launch = os.path.join(butter_robot_description_share, 'launch', 'butter_robot_description.launch.py')
 
+    # 6. rk_camera 节点
+    rk_camera_share = get_package_share_directory('rk_camera')
+    rk_camera_launch = os.path.join(rk_camera_share, 'launch', 'rk_camera.launch.py')
 
     return LaunchDescription([
         # 1. uart 节点
@@ -68,5 +71,10 @@ def generate_launch_description():
                 {'capabilities': ['clientPublish', 'parameters', 'parametersSubscribe', 'services', 'connectionGraph', 'assets']},
                 {'asset_uri_allowlist': ['^package://(?:[-\\w]+/)*[-\\w]+\\.(?:dae|fbx|glb|gltf|jpeg|jpg|mtl|obj|png|stl|tif|tiff|urdf|webp|xacro)$']}
             ]
+        ),
+        
+        # 6. rk_camera 节点
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(rk_camera_launch)
         ),
     ])

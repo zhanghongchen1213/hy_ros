@@ -38,12 +38,11 @@
   - 链接：<https://foxglove.dev/docs>
 
 - **参考资源**
+
   - [小白机器人](https://newbot.readthedocs.io/zh-cn/latest/1_product_introduction.html)
-  - [机器人操作系统 ROS 快速入门教程]()
   - [Github 鱼香 ros](https://github.com/fishros)
   - [SolidWorks 模型转 urdf](https://zhuanlan.zhihu.com/p/702891935)
   - [URDF 在线显示网站](https://gkjohnson.github.io/urdf-loaders/javascript/example/bundle/)
-  - [rknn-sherpa-onnx](rknn-sherpa-onnx)
   - [sherpa-onnx-python—api](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/speech-recognition-from-microphone-with-endpoint-detection.py)
   - [rk3588-sherpa-onnx 语音识别](https://blog.csdn.net/chui_yu666/article/details/147338735)
   - [香橙派 RK3588 部署千问大模型 Qwen2-VL-2B ](https://blog.csdn.net/lajuchenghui/article/details/150111489)
@@ -53,3 +52,5 @@
   - [RKLLM 文档](https://github.com/airockchip/rknn-llm/blob/main/doc/Rockchip_RKLLM_SDK_CN_1.2.3.pdf)
   - [RKNNLLM c++ api](https://github.com/airockchip/rknn-llm/blob/main/examples/rkllm_api_demo/deploy/src/llm_demo.cpp)
   - [Gstreamer 工具以及 MPP 插件](https://doc.embedfire.com/linux/rk356x/quick_start/zh/latest/lubancat_rk_software_hardware/software/gstreamer/gstreamer.html#gstreamer)
+
+- 根据端侧的终端报错信息，首先我需要你以文字形式描述终端遇到的报错具体是什么信息。然后提供解决方案，但是不需要你在终端运行，运行我的代码是运行在端侧的。你只需要提供我如何在终端运行什么命令就可以了。

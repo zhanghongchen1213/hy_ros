@@ -995,10 +995,16 @@ cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/butter.jpg /opt/rknn-toolki
 cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/test.py /opt/rknn-toolkit2-lite/
 
 # 3. 运行测试脚本
-python test.py
+python3 test.py
 ```
 
-- 测试结果图片
+```{figure} _static/result.jpg
+:alt: 测试结果
+:width: 100%
+:align: center
+```
+
+---
 
 ## 5. 人手跟随(拓展)
 

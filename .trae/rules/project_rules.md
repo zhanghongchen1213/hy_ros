@@ -51,6 +51,7 @@
 
 ## 构建与环境
 
+- **严禁在主机环境编译**：当前环境仅用于代码编辑，严禁执行 `colcon build` 或其他编译命令。
 - 构建前加载发行版环境：`source /opt/ros/$ROS_DISTRO/setup.bash`。
 - 构建后加载工作区环境：`source install/setup.bash`。
 - 在 NFS 环境下建议将 `build/install/log/test_results` 指向本机可写目录，或在服务器端为特定客户端配置 `no_root_squash`。

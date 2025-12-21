@@ -24,6 +24,7 @@ private:
     int width_;
     int height_;
     bool debug_fps_ = false;
+    bool rotation_180_ = true;
 };
 
 #endif // RK_CAMERA_H

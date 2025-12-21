@@ -1,5 +1,6 @@
 #include "rk_camera.h"
 #include <rclcpp_components/register_node_macro.hpp>
+#include "im2d.h"
 
 /**
  * @brief RkCamera 构造函数
@@ -23,6 +24,7 @@ RkCamera::RkCamera(const rclcpp::NodeOptions & options)
     this->declare_parameter("framerate", 30);
     this->declare_parameter("image_topic", "/yolo/image_raw");
     this->declare_parameter("debug_fps", false);
+    this->declare_parameter("rotation_180", false);
 
     // 获取参数 (Get parameters)
     int device_id = this->get_parameter("device_id").as_int();
@@ -31,6 +33,7 @@ RkCamera::RkCamera(const rclcpp::NodeOptions & options)
     int framerate = this->get_parameter("framerate").as_int();
     std::string topic_name = this->get_parameter("image_topic").as_string();
     debug_fps_ = this->get_parameter("debug_fps").as_bool();
+    rotation_180_ = this->get_parameter("rotation_180").as_bool();
 
     // 参数回调 (Parameter callback)
     params_callback_handle_ = this->add_on_set_parameters_callback(
@@ -42,13 +45,17 @@ RkCamera::RkCamera(const rclcpp::NodeOptions & options)
                     debug_fps_ = param.as_bool();
                     RCLCPP_INFO(this->get_logger(), "调试帧率日志已%s", debug_fps_ ? "开启" : "关闭");
                 }
+                if (param.get_name() == "rotation_180") {
+                    rotation_180_ = param.as_bool();
+                    RCLCPP_INFO(this->get_logger(), "旋转180度已%s", rotation_180_ ? "开启" : "关闭");
+                }
             }
             return result;
         }
     );
 
-    RCLCPP_INFO(this->get_logger(), "初始化 RkCamera，设备=/dev/video%d, %dx%d@%d",
-        device_id, width_, height_, framerate);
+    RCLCPP_INFO(this->get_logger(), "初始化 RkCamera，设备=/dev/video%d, %dx%d@%d, 旋转=%s",
+        device_id, width_, height_, framerate, rotation_180_ ? "ON" : "OFF");
 
     // 2. 创建发布者 (Create Publisher)
     // 使用 sensor_msgs::msg::Image 类型
@@ -212,10 +219,40 @@ GstFlowReturn RkCamera::on_new_sample(GstElement* sink)
         msg->step = width_;     // NV12 Y平面步长 = 宽度
 
         // 5. 数据填充 (Fill data)
-        // 这里进行了一次内存拷贝 (memcpy)。
-        // ROS 消息必须拥有数据的所有权。
+        // 这里的逻辑已更新为使用 RGA 硬件进行旋转拷贝 (Hardware Rotate + Copy)
         msg->data.resize(map.size);
-        memcpy(&msg->data[0], map.data, map.size);
+        
+        rga_buffer_t src = {};
+        src.vir_addr = (void*)map.data;
+        src.fd = -1;
+        src.width = width_;
+        src.height = height_;
+        src.wstride = width_;
+        src.hstride = height_;
+        src.format = RK_FORMAT_YCbCr_420_SP;
+
+        rga_buffer_t dst = {};
+        dst.vir_addr = (void*)&msg->data[0];
+        dst.fd = -1;
+        dst.width = width_;
+        dst.height = height_;
+        dst.wstride = width_;
+        dst.hstride = height_;
+        dst.format = RK_FORMAT_YCbCr_420_SP;
+
+        // 硬件旋转 180 度 (Hardware Rotation 180 degree)
+        if (rotation_180_) {
+            int ret = imrotate(src, dst, IM_HAL_TRANSFORM_ROT_180);
+            if (ret <= 0) {
+                 RCLCPP_ERROR(this->get_logger(), "RGA imrotate failed: %d, fallback to memcpy", ret);
+                 memcpy(&msg->data[0], map.data, map.size);
+            }
+        } else {
+            // 直接拷贝 (No rotation)
+            // 虽然可以直接 memcpy，但如果未来想做其他 RGA 操作（如 crop/resize），可以继续用 imcopy
+            // 这里为了简单和效率，直接 memcpy
+            memcpy(&msg->data[0], map.data, map.size);
+        }
 
         // 6. 发布消息 (Publish)
         // 关键点：使用 std::move(msg) 转移所有权。

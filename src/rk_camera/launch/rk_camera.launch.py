@@ -37,6 +37,8 @@ def generate_launch_description():
                     'height': LaunchConfiguration('height'), # 软编码，可在其他节点中调整
                     # 帧率
                     'framerate': LaunchConfiguration('framerate'), # 软编码，可在其他节点中调整
+                    # 旋转
+                    'rotation_180': True,
                     # 话题名称
                     'sub_control_topic': '/uart/enable_butter_yolo',
                     'pub_image_topic': '/yolo/image_raw',

@@ -24,8 +24,26 @@ find_package(image_transport REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-app-1.0)
 
+# 寻找 Rockchip 专用库 (RGA)
+find_path(RGA_INCLUDE_DIR im2d.h 
+  HINTS 
+    /usr/include/rga 
+    /usr/local/include/rga 
+    /usr/include 
+    /usr/local/include
+)
+find_library(RGA_LIBRARY rga 
+  HINTS 
+    /usr/lib 
+    /usr/lib/aarch64-linux-gnu 
+    /usr/local/lib
+)
+if (NOT RGA_INCLUDE_DIR OR NOT RGA_LIBRARY)
+  message(WARNING "RGA library not found. Please ensure librga-dev is installed.")
+endif()
+
 # 6.新增：包含 src 目录以支持同目录下的头文件（必选）
-include_directories(include src)
+include_directories(include src ${RGA_INCLUDE_DIR})
 
 # 编译库（组件）
 add_library(rk_camera_component SHARED
@@ -35,9 +53,11 @@ target_include_directories(rk_camera_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   ${GST_INCLUDE_DIRS}
+  ${RGA_INCLUDE_DIR}
 )
 target_link_libraries(rk_camera_component
   ${GST_LIBRARIES}
+  ${RGA_LIBRARY}
 )
 
 ament_target_dependencies(rk_camera_component

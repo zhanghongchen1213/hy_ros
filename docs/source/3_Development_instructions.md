@@ -398,6 +398,10 @@ chmod +x /lib/librkllmrt.so
 
 # 5. 更新rkllm.h头文件，为后续ros2 C++开发提供支持
 cp /opt/rknn-llm/rknn-llm/rkllm-runtime/Linux/librkllm_api/include/rkllm.h /usr/include/
+cp /opt/rknn-llm/rknn-llm/examples/multimodal_model_demo/deploy/3rdparty/librknnrt/Linux/librknn_api/include/rknn_api.h /usr/include/
+sudo ldconfig
+ls -l /usr/include/rkllm.h
+ls -l /usr/include/rknn_api.h
 
 # 6.复制rkllm模型文件
 cd install/demo_Linux_aarch64
@@ -1114,7 +1118,61 @@ sudo systemctl start go2rtc
 
 ## 2. RKNN-NPU 部署
 
-## 2. RKNN-NPU 部署
+在进行 NPU 推理开发前，必须确保系统已启用 RGA 硬件加速驱动，并安装了用户态库文件 (`librga`)。
+RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，可用于加速点/线绘制，执行图像缩放、旋转、bitBlt、alpha 混合等常见的 2D 图形操作。
+
+### 2.1 检查 RGA 驱动
+
+RGA 驱动通常由内核提供。执行以下命令检查驱动是否加载：
+
+```bash
+# 检查是否已加载 rga 模块
+lsmod | grep rga
+
+# 确认设备节点存在
+ls -l /dev/rga
+
+# 如果没有输出，尝试手动加载（根据芯片不同，可能是 rga, rga2 或 rga3）
+sudo modprobe rga3
+# 或
+sudo modprobe rga2
+```
+
+如果 `modprobe` 无报错且 `/dev/rga` 存在，说明驱动正常。
+
+### 2.2 安装 librga
+
+```bash
+# 1. 准备目录
+sudo mkdir -p /opt/3rdparty
+cd /opt/3rdparty
+
+# 2. 克隆官方仓库
+sudo git clone https://gitee.com/airockchip/librga.git librga
+cd librga
+
+# 3. 安装预编译库
+# 安装头文件
+sudo cp -r include/* /usr/local/include/
+
+# 安装库文件 (针对 RK3588/Linux aarch64)
+sudo cp -r libs/Linux/gcc-aarch64/* /usr/local/lib/
+
+# 4. 刷新动态库缓存
+sudo ldconfig
+
+# 5. 验证安装结果
+ls -l /usr/local/include/im2d.h      # 应显示文件信息
+ls -l /usr/local/lib/librga.so       # 应显示文件信息
+```
+
+```{figure} _static/{1C2440DD-4BCE-4C79-8951-C055DFBF109E}.png
+:alt: 测试结果
+:width: 100%
+:align: center
+```
+
+---
 
 ## 3. RTSP 推流
 

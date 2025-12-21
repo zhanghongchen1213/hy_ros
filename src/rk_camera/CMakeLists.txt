@@ -39,6 +39,7 @@ target_include_directories(rk_camera_component PUBLIC
 target_link_libraries(rk_camera_component
   ${GST_LIBRARIES}
 )
+
 ament_target_dependencies(rk_camera_component
   rclcpp
   rclcpp_components

@@ -39,7 +39,7 @@ def generate_launch_description():
                     'framerate': LaunchConfiguration('framerate'), # 软编码，可在其他节点中调整
                     # 话题名称
                     'sub_control_topic': '/uart/enable_butter_yolo',
-                    'pub_image_topic': '/camera/image_raw',
+                    'pub_image_topic': '/yolo/image_raw',
                     # 调试开关
                     'debug_fps': False,
                 }

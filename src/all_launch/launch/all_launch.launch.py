@@ -5,6 +5,8 @@ from ament_index_python.packages import get_package_share_directory
 import os
 
 from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description():
     # 1. uart 节点
@@ -26,10 +28,6 @@ def generate_launch_description():
     # 5. butter_robot_description 节点
     butter_robot_description_share = get_package_share_directory('butter_robot_description')
     butter_robot_description_launch = os.path.join(butter_robot_description_share, 'launch', 'butter_robot_description.launch.py')
-
-    # 6. rk_camera 节点
-    rk_camera_share = get_package_share_directory('rk_camera')
-    rk_camera_launch = os.path.join(rk_camera_share, 'launch', 'rk_camera.launch.py')
 
     return LaunchDescription([
         # 1. uart 节点
@@ -73,8 +71,54 @@ def generate_launch_description():
             ]
         ),
         
-        # 6. rk_camera 节点
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(rk_camera_launch)
-        ),
+        # 6. 视觉管道 (rk_camera + rk_inference + rk_streamer)
+        # 使用 ComposableNodeContainer 将它们运行在同一个进程容器中，启用零拷贝通信
+        ComposableNodeContainer(
+            name='butter_vision_container',
+            namespace='',
+            package='rclcpp_components',
+            executable='component_container',
+            composable_node_descriptions=[
+                # 6.1 rk_camera 组件
+                ComposableNode(
+                    package='rk_camera',
+                    plugin='RkCamera',
+                    name='rk_camera',
+                    parameters=[
+                        {'device_id': 0},
+                        {'width': 1920},
+                        {'height': 1080},
+                        {'framerate': 30},
+                        {'image_topic': '/camera/image_raw'},
+                        {'debug_fps': False}
+                    ],
+                    extra_arguments=[{'use_intra_process_comms': True}]
+                ),
+                # 6.2 rk_inference 组件
+                ComposableNode(
+                    package='rk_inference',
+                    plugin='RkInference',
+                    name='rk_inference',
+                    parameters=[
+                        # 根据需要添加参数，目前 rk_inference 可能还没有定义太多参数
+                    ],
+                    extra_arguments=[{'use_intra_process_comms': True}]
+                ),
+                # 6.3 rk_streamer 组件
+                ComposableNode(
+                    package='rk_streamer',
+                    plugin='RkStreamer',
+                    name='rk_streamer',
+                    parameters=[
+                        {'width': 1920},
+                        {'height': 1080},
+                        {'fps': 30},
+                        {'topic': '/camera/image_raw'}, # 订阅 rk_camera 发布的话题
+                        {'pipeline': 'appsrc ! videoconvert ! mpph264enc ! h264parse ! rtspclientsink location=rtsp://127.0.0.1:8554/live'}
+                    ],
+                    extra_arguments=[{'use_intra_process_comms': True}]
+                )
+            ],
+            output='screen',
+        )
     ])

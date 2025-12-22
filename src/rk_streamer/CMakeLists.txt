@@ -21,6 +21,10 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 
+# 5. 寻找 GStreamer
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-app-1.0)
+
 # 6.包含 src 目录
 include_directories(include src)
 
@@ -33,10 +37,12 @@ target_include_directories(rk_streamer_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   ${OpenCV_INCLUDE_DIRS}
+  ${GST_INCLUDE_DIRS}
 )
 
 target_link_libraries(rk_streamer_component
   ${OpenCV_LIBRARIES}
+  ${GST_LIBRARIES}
 )
 
 ament_target_dependencies(rk_streamer_component

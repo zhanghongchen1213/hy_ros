@@ -11,8 +11,12 @@ RkStreamer::RkStreamer(const rclcpp::NodeOptions & options)
     this->declare_parameter("sub_topic", "/yolo/image_infer");
     
     // GStreamer 管道配置
-    // 注意：输入格式设置为 NV12，以便直接透传或由硬件编码器处理
-    std::string default_pipeline = "appsrc ! video/x-raw,format=NV12,width=1920,height=1080 ! mpph264enc ! rtspclientsink location=rtsp://127.0.0.1:8554/live";
+    // 恢复 MPP 硬件编码
+    // 策略：appsrc -> videoconvert -> mpph264enc -> h264parse -> rtspclientsink
+    // 移除 protocols=tcp 以允许自动协商，添加 async=false 避免状态阻塞
+    // 更新：强制使用 protocols=tcp 以解决 go2rtc 连接问题，并显式设置 defaults
+    // 修正：移除不支持的 async=false 属性，恢复 config-interval=-1 (IDR 帧发送 SPS/PPS)
+    std::string default_pipeline = "appsrc name=source ! video/x-raw,format=NV12 ! videoconvert ! mpph264enc ! h264parse config-interval=-1 ! rtspclientsink location=rtsp://127.0.0.1:8554/camera protocols=tcp";
     this->declare_parameter("pipeline", default_pipeline);
 
     // 获取参数
@@ -20,13 +24,12 @@ RkStreamer::RkStreamer(const rclcpp::NodeOptions & options)
     height_ = this->get_parameter("height").as_int();
     fps_ = this->get_parameter("fps").as_int();
     std::string topic = this->get_parameter("sub_topic").as_string();
-    pipeline_ = this->get_parameter("pipeline").as_string();
+    pipeline_str_ = this->get_parameter("pipeline").as_string();
 
     RCLCPP_INFO(this->get_logger(), "初始化 RkStreamer, 订阅: %s", topic.c_str());
-    RCLCPP_INFO(this->get_logger(), "GStreamer 管道: %s", pipeline_.c_str());
+    RCLCPP_INFO(this->get_logger(), "GStreamer 管道配置 (生效值): %s", pipeline_str_.c_str());
 
     // 创建订阅者
-    // 使用 image_transport 支持压缩传输（虽然这里我们直接处理 raw NV12）
     sub_ = image_transport::create_subscription(
         this, 
         topic, 
@@ -35,86 +38,215 @@ RkStreamer::RkStreamer(const rclcpp::NodeOptions & options)
         rmw_qos_profile_sensor_data
     );
 
-    // 尝试初始化 VideoWriter
+    // 初始化 GStreamer
+    if (!gst_is_initialized()) {
+        gst_init(nullptr, nullptr);
+    }
+
+    // 启动 GLib 主循环 (RTSP 插件依赖此循环处理网络 I/O)
+    main_loop_ = g_main_loop_new(nullptr, FALSE);
+    main_loop_thread_ = std::thread([this]() {
+        g_main_loop_run(main_loop_);
+    });
+
+    // 尝试初始化
     if (width_ > 0 && height_ > 0) {
-        init_video_writer();
+        init_gst_pipeline();
     }
 }
 
 RkStreamer::~RkStreamer()
 {
-    if (writer_ && writer_->isOpened()) {
-        writer_->release();
+    if (pipeline_obj_) {
+        gst_element_set_state(pipeline_obj_, GST_STATE_NULL);
+        gst_object_unref(pipeline_obj_);
+    }
+
+    if (main_loop_) {
+        g_main_loop_quit(main_loop_);
+        if (main_loop_thread_.joinable()) {
+            main_loop_thread_.join();
+        }
+        g_main_loop_unref(main_loop_);
     }
 }
 
-void RkStreamer::init_video_writer()
+void RkStreamer::init_gst_pipeline()
 {
     if (is_initialized_) return;
 
-    try {
-        writer_ = std::make_unique<cv::VideoWriter>(
-            pipeline_, 
-            cv::CAP_GSTREAMER, 
-            0, // fourcc ignored for GStreamer
-            fps_, 
-            cv::Size(width_, height_), 
-            true // isColor
-        );
-
-        if (!writer_->isOpened()) {
-            RCLCPP_ERROR(this->get_logger(), "无法打开 VideoWriter (GStreamer管道可能错误)");
-        } else {
-            RCLCPP_INFO(this->get_logger(), "VideoWriter 已打开 (%dx%d@%d)", width_, height_, fps_);
-            is_initialized_ = true;
+    GError *error = nullptr;
+    
+    // 1. 解析管道字符串
+    std::string final_pipeline = pipeline_str_;
+    if (final_pipeline.find("name=source") == std::string::npos) {
+        size_t pos = final_pipeline.find("appsrc");
+        if (pos != std::string::npos) {
+            final_pipeline.replace(pos, 6, "appsrc name=source");
+            RCLCPP_WARN(this->get_logger(), "自动为 appsrc 添加 name=source: %s", final_pipeline.c_str());
         }
-    } catch (const cv::Exception& e) {
-        RCLCPP_ERROR(this->get_logger(), "OpenCV 异常: %s", e.what());
     }
+
+    pipeline_obj_ = gst_parse_launch(final_pipeline.c_str(), &error);
+    
+    if (error) {
+        RCLCPP_ERROR(this->get_logger(), "GStreamer 管道解析失败: %s", error->message);
+        g_error_free(error);
+        return;
+    }
+
+    if (!pipeline_obj_) {
+        RCLCPP_ERROR(this->get_logger(), "无法创建 GStreamer 管道对象");
+        return;
+    }
+
+    // 2. 获取 appsrc 元素
+    appsrc_ = gst_bin_get_by_name(GST_BIN(pipeline_obj_), "source");
+    if (!appsrc_) {
+        RCLCPP_ERROR(this->get_logger(), "无法在管道中找到 'source' (appsrc) 元素");
+        gst_object_unref(pipeline_obj_);
+        pipeline_obj_ = nullptr;
+        return;
+    }
+
+    // [关键修正] 将 Pipeline 的消息总线挂载到 GLib 主循环
+    // 如果不挂载，RTSP 插件的网络事件将无法被 MainLoop 处理
+    GstBus *bus = gst_element_get_bus(pipeline_obj_);
+    gst_bus_add_watch(bus, [](GstBus *bus, GstMessage *msg, gpointer data) -> gboolean {
+        RkStreamer *node = (RkStreamer *)data;
+        switch (GST_MESSAGE_TYPE(msg)) {
+            case GST_MESSAGE_ERROR: {
+                GError *err;
+                gchar *debug;
+                gst_message_parse_error(msg, &err, &debug);
+                RCLCPP_ERROR(node->get_logger(), "Pipeline Error: %s", err->message);
+                if (debug) {
+                    RCLCPP_ERROR(node->get_logger(), "Debug Info: %s", debug);
+                }
+                g_error_free(err);
+                g_free(debug);
+                break;
+            }
+            case GST_MESSAGE_WARNING: {
+                GError *err;
+                gchar *debug;
+                gst_message_parse_warning(msg, &err, &debug);
+                RCLCPP_WARN(node->get_logger(), "Pipeline Warning: %s", err->message);
+                if (debug) {
+                    RCLCPP_WARN(node->get_logger(), "Debug Info: %s", debug);
+                }
+                g_error_free(err);
+                g_free(debug);
+                break;
+            }
+            default:
+                break;
+        }
+        return TRUE;
+    }, this);
+    gst_object_unref(bus);
+
+    // 3. 配置 appsrc
+    // 显式设置 caps，确保 appsrc 知道输入数据的确切格式
+    // 关键修正：设置 is-live=true 和 format=TIME，对齐 gst-launch 行为
+    g_object_set(G_OBJECT(appsrc_), 
+        "stream-type", 0, // GST_APP_STREAM_TYPE_STREAM
+        "format", GST_FORMAT_TIME,
+        "is-live", TRUE,
+        "do-timestamp", TRUE, // 让 appsrc 辅助处理时间戳
+        NULL);
+    
+    GstCaps *caps = gst_caps_new_simple("video/x-raw",
+        "format", G_TYPE_STRING, "NV12",
+        "width", G_TYPE_INT, width_,
+        "height", G_TYPE_INT, height_,
+        "framerate", GST_TYPE_FRACTION, fps_, 1,
+        NULL);
+    gst_app_src_set_caps(GST_APP_SRC(appsrc_), caps);
+    gst_caps_unref(caps);
+
+    // 4. 启动管道
+    GstStateChangeReturn ret = gst_element_set_state(pipeline_obj_, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        RCLCPP_ERROR(this->get_logger(), "无法将管道设置为 PLAYING 状态");
+        gst_object_unref(pipeline_obj_); // appsrc_ 由 pipeline 管理，无需单独 unref
+        pipeline_obj_ = nullptr;
+        appsrc_ = nullptr;
+        return;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "GStreamer 管道已启动");
+    is_initialized_ = true;
 }
 
 void RkStreamer::image_callback(const sensor_msgs::msg::Image::ConstSharedPtr & msg)
 {
-    // 如果未初始化且参数为0，则使用第一帧的尺寸
+    // 延迟初始化
     if (!is_initialized_) {
         if (width_ <= 0) width_ = msg->width;
         if (height_ <= 0) height_ = msg->height;
-        init_video_writer();
+        init_gst_pipeline();
     }
 
-    if (!is_initialized_ || !writer_ || !writer_->isOpened()) {
-        return; // 初始化失败或未就绪
-    }
-
-    // 关键：处理 NV12 格式数据
-    // 假设输入 msg->encoding 为 "nv12" 且数据已经是 NV12 格式
-    // 此时 msg->data 包含 Y + UV 数据
-    // NV12 高度 = H + H/2 = 1.5 * H
-    // OpenCV 中可以用 CV_8UC1 来包装这块内存，高度设为 1.5倍
-    
-    // 简单校验一下数据大小
-    size_t expected_size = width_ * height_ * 3 / 2;
-    if (msg->data.size() < expected_size) {
-        RCLCPP_WARN(this->get_logger(), "数据大小不足 NV12: expected %zu, got %zu", expected_size, msg->data.size());
+    if (!is_initialized_ || !appsrc_) {
         return;
     }
 
-    try {
-        // 创建 cv::Mat 包装 msg 数据，不拷贝
-        // 注意：const_cast 是必须的，因为 cv::Mat 构造函数不接受 const void*，但只要我们不修改它且 writer 只读即可
-        cv::Mat nv12_img(height_ + height_ / 2, width_, CV_8UC1, (void*)&msg->data[0]);
+    // 检查数据大小 (NV12: w * h * 1.5)
+    size_t expected_size = width_ * height_ * 3 / 2;
+    if (msg->data.size() < expected_size) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+            "数据大小不足 NV12: expected %zu, got %zu", expected_size, msg->data.size());
+        return;
+    }
 
-        // 写入 GStreamer 管道 (OpenCV 可能会做一次拷贝到底层 Buffer，但这已经是极小的开销)
-        writer_->write(nv12_img);
-        
-        // 调试日志 (每30帧)
-        static int count = 0;
-        if (++count % 30 == 0) {
-            RCLCPP_DEBUG(this->get_logger(), "已推流 %d 帧", count);
-        }
+    // [调试] 打印接收到的图像信息和时间戳
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+        "接收图像: %dx%d, size=%zu, encoding=%s", msg->width, msg->height, msg->data.size(), msg->encoding.c_str());
 
-    } catch (const cv::Exception& e) {
-        RCLCPP_ERROR(this->get_logger(), "OpenCV write 异常: %s", e.what());
+
+
+    // 创建 GstBuffer
+    // 注意：这里需要拷贝数据，因为 ROS 消息内存生命周期由 ROS 管理，而 GST 需要自己的 buffer
+    // 或者可以使用 gst_buffer_new_wrapped_full 配合 destroy notify，但拷贝最安全
+    GstBuffer *buffer = gst_buffer_new_allocate(NULL, expected_size, NULL);
+    if (!buffer) {
+        RCLCPP_ERROR(this->get_logger(), "无法分配 GstBuffer");
+        return;
+    }
+
+    GstMapInfo map;
+    if (gst_buffer_map(buffer, &map, GST_MAP_WRITE)) {
+        memcpy(map.data, msg->data.data(), expected_size);
+        gst_buffer_unmap(buffer, &map);
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "无法映射 GstBuffer 内存");
+        gst_buffer_unref(buffer);
+        return;
+    }
+
+    // 设置时间戳
+    // GStreamer 对时间戳非常敏感，必须设置 PTS 和 Duration
+    // 使用内置计数器生成连续的时间戳，避免因 ROS 消息抖动导致丢帧
+    static GstClockTime timestamp = 0;
+    GstClockTime duration = gst_util_uint64_scale_int(1, GST_SECOND, fps_);
+
+    GST_BUFFER_PTS(buffer) = timestamp;
+    GST_BUFFER_DTS(buffer) = timestamp;
+    GST_BUFFER_DURATION(buffer) = duration;
+
+    // [调试] 打印 buffer 时间戳信息
+    RCLCPP_DEBUG(this->get_logger(), "Push buffer: pts=%lu, duration=%lu", timestamp, duration);
+
+    timestamp += duration;
+
+    // 推送数据
+    GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(appsrc_), buffer);
+    if (ret != GST_FLOW_OK) {
+        RCLCPP_WARN(this->get_logger(), "gst_app_src_push_buffer 失败: %d", ret);
+    } else {
+        // [调试] 推送成功
+        RCLCPP_DEBUG(this->get_logger(), "Buffer pushed successfully");
     }
 }
 

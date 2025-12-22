@@ -1018,9 +1018,7 @@ python3 test.py
 
 # 六、yolov8n 目标检测部署
 
-## 1. 目标检测、推流全硬件加速
-
-### 1.1 基本原理
+## 1. 基本原理
 
 整个 **rk_camera** 到 **rk_inference** 再到 **rk_streamer** 的流程设计，充分利用了 RK3588S 的异构计算架构（ISP、RGA、NPU、VPU），实现了端到端的低延迟和高效处理。利用 ROS2 的组件设计，使用 UniquePtr 实现多个节点之间的零拷贝数据传输，避免了 CPU 拷贝带来的性能损失，可大幅提升系统吞吐量。
 
@@ -1052,9 +1050,11 @@ python3 test.py
 | **硬件编码** | Pipeline 字符串中的 **mpph264enc**     | **VPU (RKVENC)** | **核心触发点！** mpph264enc 插件调用 MPP 库，MPP 库驱动 **VPU 硬件**。VPU 读取 NV12 原始数据，根据 H.264 算法进行帧内预测、运动估计，输出压缩后的码流。 |
 | **网络发送** | rtspclientsink                         | **CPU/网卡**     | CPU 将压缩好的小数据包通过网络协议栈发给网卡。                                                                                                          |
 
-### 1.2 端侧依赖安装
+## 2. 端侧依赖安装
 
 在 RK3588S 端侧（Ubuntu 系统）上，需要安装以下基础库：
+
+### 2.1 安装 GStreamer 和 rga
 
 ```bash
 # 1. 安装 GStreamer 及其插件（包含 app 库）
@@ -1062,108 +1062,84 @@ python3 test.py
 sudo sed -i 's/mirrors.tuna.tsinghua.edu.cn/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
 sudo apt-get update
 
-# 安装 GStreamer 及其插件（包含 app 库）
-sudo apt-get install -y --fix-missing libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+# 编译安装 Rockchip 多媒体组件 , 包含编译器、构建系统、基础 GStreamer 库及 libdrm
+sudo apt-get install -y --fix-missing gcc g++ cmake meson ninja-build \
+    libdrm-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-    gstreamer1.0-tools
+    gstreamer1.0-tools gstreamer1.0-rtsp
 
-# 2. 安装 ROS2 依赖
-sudo apt-get install -y ros-humble-image-transport ros-humble-cv-bridge
+# 2. 创建工作目录
+sudo mkdir -p /opt/rk_multimedia
+sudo chown $USER:$USER /opt/rk_multimedia
+cd /opt/rk_multimedia
 
-# 3. 安装 RTSP 推流服务器 (go2rtc)
-# go2rtc 是一个轻量级、零依赖的流媒体服务器，支持 RTSP/WebRTC/HLS 等多种协议
-# 建议直接下载二进制文件到 /usr/local/bin
-wget https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_arm64 -O /usr/local/bin/go2rtc
-chmod +x /usr/local/bin/go2rtc
+# 3. 编译安装 MPP (Media Process Platform)
+git clone https://github.com/rockchip-linux/mpp.git --depth=1
+cd mpp
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+cd ../..
 
-# 4. 配置与自启动，配合foxglove实现推流视频可视化
-# 4.1 创建配置文件 /etc/go2rtc.yaml
-# 使用以下命令创建最小化配置，开启 RTSP 和 WebRTC
-sudo bash -c 'cat <<EOF > /etc/go2rtc.yaml
-streams:
-  # 定义一个名为 "camera" 的流，来源可以是 RTSP, HTTP-FLV, 甚至是 exec 命令
-  # 这里我们预留接口，稍后 rk_streamer 节点会将流推送到 rtsp://127.0.0.1:8554/camera
-  camera: rtsp://127.0.0.1:8554/camera
-
-rtsp:
-  listen: ":8554"
-
-webrtc:
-  listen: ":8555"
-  candidates:
-    - 192.168.22.219:8555 # 请修改为你的板卡实际 IP
-EOF'
-
-# 4.2 设置go2rtc开机自启动 (Systemd 服务)
-sudo bash -c 'cat <<EOF > /etc/systemd/system/go2rtc.service
-[Unit]
-Description=Go2RTC Media Server
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/go2rtc -c /etc/go2rtc.yaml
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF'
-
-# 启用并启动服务
-sudo systemctl daemon-reload
-sudo systemctl enable go2rtc
-sudo systemctl start go2rtc
-```
-
-## 2. RKNN-NPU 部署
-
-在进行 NPU 推理开发前，必须确保系统已启用 RGA 硬件加速驱动，并安装了用户态库文件 (`librga`)。
-RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，可用于加速点/线绘制，执行图像缩放、旋转、bitBlt、alpha 混合等常见的 2D 图形操作。
-
-### 2.1 检查 RGA 驱动
-
-RGA 驱动通常由内核提供。执行以下命令检查驱动是否加载：
-
-```bash
-# 检查是否已加载 rga 模块
-lsmod | grep rga
-
-# 确认设备节点存在
-ls -l /dev/rga
-
-# 如果没有输出，尝试手动加载（根据芯片不同，可能是 rga, rga2 或 rga3）
-sudo modprobe rga3
-# 或
-sudo modprobe rga2
-```
-
-如果 `modprobe` 无报错且 `/dev/rga` 存在，说明驱动正常。
-
-### 2.2 安装 librga
-
-```bash
-# 1. 准备目录
-sudo mkdir -p /opt/3rdparty
-cd /opt/3rdparty
-
-# 2. 克隆官方仓库
-sudo git clone https://gitee.com/airockchip/librga.git librga
+# 2.3 安装 librga (使用预编译库)
+# RGA 硬件加速库，gstreamer-rockchip 依赖此库
+# 使用 Gitee 官方仓库的预编译库，无需编译
+git clone https://gitee.com/airockchip/librga.git --depth=1
 cd librga
 
-# 3. 安装预编译库
 # 安装头文件
 sudo cp -r include/* /usr/local/include/
 
-# 安装库文件 (针对 RK3588/Linux aarch64)
+# 安装库文件 (适配 RK3588/aarch64)
+# 包含 .so 动态库
 sudo cp -r libs/Linux/gcc-aarch64/* /usr/local/lib/
 
-# 4. 刷新动态库缓存
-sudo ldconfig
+# 手动创建 pkgconfig 文件 (源码包中未提供)
+# 必须创建此文件，meson 才能找到 librga
+sudo mkdir -p /usr/local/lib/pkgconfig
+sudo tee /usr/local/lib/pkgconfig/librga.pc > /dev/null <<EOF
+prefix=/usr/local
+exec_prefix=\${prefix}
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
 
-# 5. 验证安装结果
-ls -l /usr/local/include/im2d.h      # 应显示文件信息
-ls -l /usr/local/lib/librga.so       # 应显示文件信息
+Name: librga
+Description: Rockchip RGA 2D graphics acceleration library
+Version: 1.10.0
+Libs: -L\${libdir} -lrga
+Cflags: -I\${includedir}
+EOF
+
+# 更新动态库缓存
+sudo ldconfig
+cd ..
+
+# 5. 编译安装 gstreamer-rockchip 插件 (使用 Gitee 镜像)
+# 由于 GitHub 连接不稳定，推荐使用 Gitee 镜像
+# emancipator 仓库是 JeffyCN/mirrors (gstreamer-rockchip 分支) 的完整镜像
+git clone https://gitee.com/emancipator/gstreamer-rockchip.git gstreamer-rockchip
+cd gstreamer-rockchip
+
+# 必须设置 PKG_CONFIG_PATH 确保能找到 librga
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+
+meson setup build --prefix=/usr --buildtype=release
+ninja -C build
+sudo ninja -C build install
+
+# 6. 更新库缓存并验证
+gst-inspect-1.0 | grep mpp
+
+#信息输出如下
+rockchipmpp:  mpph264enc: Rockchip Mpp H264 Encoder
+rockchipmpp:  mpph265enc: Rockchip Mpp H265 Encoder
+rockchipmpp:  mppvp8enc: Rockchip Mpp VP8 Encoder
+rockchipmpp:  mppjpegenc: Rockchip Mpp JPEG Encoder
+rockchipmpp:  mppvideodec: Rockchip's MPP video decoder
+rockchipmpp:  mppjpegdec: Rockchip's MPP JPEG image decoder
 ```
 
 ```{figure} _static/{1C2440DD-4BCE-4C79-8951-C055DFBF109E}.png
@@ -1174,7 +1150,99 @@ ls -l /usr/local/lib/librga.so       # 应显示文件信息
 
 ---
 
-## 3. RTSP 推流
+### 2.1 安装 RTSP 推流服务器
+
+```bash
+# 1. 安装 ROS2 依赖
+sudo apt-get install -y ros-humble-image-transport ros-humble-cv-bridge
+
+# 2. 安装 RTSP 推流服务器 (go2rtc)
+# go2rtc 是一个轻量级、零依赖的流媒体服务器，支持 RTSP/WebRTC/HLS 等多种协议
+# 建议直接下载二进制文件到 /usr/local/bin
+wget https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_arm64 -O /usr/local/bin/go2rtc
+chmod +x /usr/local/bin/go2rtc
+
+# 3. 配置与自启动，配合foxglove实现推流视频可视化
+# 3.1 创建配置文件 /etc/go2rtc.yaml
+# 使用以下命令创建最小化配置，开启 RTSP 和 WebRTC
+# 注意：api 模块默认监听 1984 端口，提供 Web 管理界面
+# 关键修正：streams 列表必须留空！因为 rk_streamer 会主动推流上来，
+# 如果在这里配置了 camera 地址，会导致 go2rtc 尝试自我拉流从而产生死循环。
+sudo bash -c 'cat <<EOF > /etc/go2rtc.yaml
+streams:
+  camera: null
+
+api:
+  listen: ":1984"
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555"
+  candidates:
+    - 192.168.22.219:8555 # 请修改为你的板卡实际 IP
+EOF'
+
+# 3.2 设置go2rtc开机自启动 (Systemd 服务)
+# 注意：WorkDir 设置为 /etc/ 以便读取配置文件
+sudo bash -c 'cat <<EOF > /etc/systemd/system/go2rtc.service
+[Unit]
+Description=Go2RTC Media Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/go2rtc -c /etc/go2rtc.yaml
+WorkingDirectory=/etc
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+
+# 3.3 启用并启动服务
+sudo systemctl daemon-reload
+sudo systemctl enable go2rtc
+sudo systemctl start go2rtc
+```
+
+## 2. RKNN-NPU 部署
+
+在进行 NPU 推理开发前，必须确保系统已启用 RGA 硬件加速驱动，并安装了用户态库文件 (`librga`)。
+RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，可用于加速点/线绘制，执行图像缩放、旋转、bitBlt、alpha 混合等常见的 2D 图形操作。
+
+```{figure} _static/{1C2440DD-4BCE-4C79-8951-C055DFBF109E}.png
+:alt: 测试结果
+:width: 100%
+:align: center
+```
+
+---
+
+## 3. RTSP 推流与 Foxglove 可视化
+
+### 3.1 验证推流状态
+
+当 `rk_streamer` 正常运行后，它会主动将视频流推送到 `rtsp://127.0.0.1:8554/camera`。
+在 go2rtc 的管理界面 (http://<板卡 IP>:1984/) 中，你应该能看到名为 `camera` 的流自动出现。
+
+- 点击 `stream` 链接可直接在浏览器预览。
+- 如果流未出现，请检查 `rk_streamer` 日志是否有报错。
+
+### 3.2 Foxglove Studio 可视化配置
+
+Foxglove 是一个强大的 ROS 数据可视化工具，支持通过 WebRTC 直接查看低延迟视频流。
+
+**Foxglove Studio 添加 WebRTC 视频面板**
+
+- 在布局中添加一个 **"Live Stream"** (或 "Webpage") 面板。
+- **URL 设置**：
+  - Foxglove 目前不直接支持原始 RTSP，但 go2rtc 提供了兼容的 WebRTC/MJPEG 接口。
+  - 推荐使用 MJPEG 流地址（兼容性最好）：
+    `http://<板卡IP>:1984/api/stream.mjpeg?src=camera`
+  - 或者尝试 WebRTC 接口（低延迟，需浏览器支持）：
+    `http://<板卡IP>:1984/webrtc.html?src=camera`
 
 # 七、SLAM 部署
 

@@ -89,7 +89,9 @@ def generate_launch_description():
                         {'width': 1920},
                         {'height': 1080},
                         {'framerate': 30},
-                        {'image_topic': '/camera/image_raw'},
+                        {'rotation_180': True},
+                        {'sub_control_topic': '/uart/enable_butter_yolo'},
+                        {'pub_image_topic': '/yolo/image_raw'},
                         {'debug_fps': False}
                     ],
                     extra_arguments=[{'use_intra_process_comms': True}]
@@ -100,7 +102,11 @@ def generate_launch_description():
                     plugin='RkInference',
                     name='rk_inference',
                     parameters=[
-                        # 根据需要添加参数，目前 rk_inference 可能还没有定义太多参数
+                        {'sub_topic': '/yolo/image_raw'}, # 订阅 rk_camera
+                        {'pub_topic': '/yolo/image_infer'}, # 发布推流图像
+                        {'model_path': '/opt/rknn-toolkit2-lite/yolov8.rknn'},
+                        {'conf_threshold': 0.5},
+                        {'nms_threshold': 0.45}
                     ],
                     extra_arguments=[{'use_intra_process_comms': True}]
                 ),
@@ -113,8 +119,8 @@ def generate_launch_description():
                         {'width': 1920},
                         {'height': 1080},
                         {'fps': 30},
-                        {'topic': '/camera/image_raw'}, # 订阅 rk_camera 发布的话题
-                        {'pipeline': 'appsrc ! videoconvert ! mpph264enc ! h264parse ! rtspclientsink location=rtsp://127.0.0.1:8554/live'}
+                        {'sub_topic': '/yolo/image_infer'}, # 订阅 rk_inference 发布的话题
+                        {'pipeline': 'appsrc name=source ! video/x-raw,format=NV12,width=1920,height=1080,framerate=30/1 ! videoconvert ! mpph264enc ! h264parse config-interval=-1 ! rtspclientsink location=rtsp://127.0.0.1:8554/camera protocols=tcp'}
                     ],
                     extra_arguments=[{'use_intra_process_comms': True}]
                 )

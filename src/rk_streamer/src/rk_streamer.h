@@ -7,6 +7,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <memory>
+#include <gst/gst.h>
+#include <gst/app/gstappsrc.h>
 
 class RkStreamer : public rclcpp::Node {
 public:
@@ -15,16 +17,21 @@ public:
 
 private:
     void image_callback(const sensor_msgs::msg::Image::ConstSharedPtr & msg);
-    void init_video_writer();
+    void init_gst_pipeline();
 
     image_transport::Subscriber sub_;
-    std::unique_ptr<cv::VideoWriter> writer_;
+    
+    // GStreamer elements
+    GstElement *pipeline_obj_ = nullptr;
+    GstElement *appsrc_ = nullptr;
+    GMainLoop *main_loop_ = nullptr;
+    std::thread main_loop_thread_;
     
     // Parameters
     int width_;
     int height_;
     int fps_;
-    std::string pipeline_;
+    std::string pipeline_str_;
     bool is_initialized_ = false;
 };
 

@@ -14,7 +14,7 @@ def generate_launch_description():
                     'height': 1080,
                     'fps': 30,
                     'sub_topic': '/yolo/image_infer',
-                    'pipeline': 'appsrc ! videoconvert ! mpph264enc ! h264parse ! rtspclientsink location=rtsp://127.0.0.1:8554/camera'
+                    'pipeline': 'appsrc name=source ! video/x-raw,format=NV12 ! videoconvert ! mpph264enc ! h264parse config-interval=-1 ! rtspclientsink location=rtsp://127.0.0.1:8554/camera protocols=tcp'
                 }
             ]
         )

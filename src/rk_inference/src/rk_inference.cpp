@@ -80,6 +80,74 @@ static float iou(DetectObject& a, DetectObject& b) {
     return inter / (a.w * a.h + b.w * b.h - inter);
 }
 
+// 辅助函数：CPU 端 NV12 绘制矩形框 (Fallback)
+// 颜色：红色 (Red) -> Y=82, U=90, V=240
+static void nv12_draw_rect(uint8_t* nv12_data, int width, int height, int x, int y, int w, int h, int thickness) {
+    int y_start = std::max(0, y);
+    int y_end = std::min(height - 1, y + h);
+    int x_start = std::max(0, x);
+    int x_end = std::min(width - 1, x + w);
+
+    // NV12 格式：先全是 Y，然后是 UV 交替
+    // UV 平面起始偏移
+    int uv_offset = width * height;
+    
+    // 红色分量
+    uint8_t Y_val = 82;
+    uint8_t U_val = 90;
+    uint8_t V_val = 240;
+
+    auto draw_pixel = [&](int row, int col) {
+        // 设置 Y
+        nv12_data[row * width + col] = Y_val;
+        
+        // 设置 UV (2x2 下采样，每 2x2 个 Y 共享一组 UV)
+        // UV 行号 = row / 2
+        // UV 列号 = (col / 2) * 2 (因为 U 和 V 交替存储)
+        int uv_row = row / 2;
+        int uv_col = (col / 2) * 2;
+        int uv_index = uv_offset + uv_row * width + uv_col;
+        
+        // 边界检查
+        if (uv_index + 1 < width * height * 3 / 2) {
+            nv12_data[uv_index] = U_val;     // U
+            nv12_data[uv_index + 1] = V_val; // V
+        }
+    };
+
+    // 绘制上下边
+    for (int r = 0; r < thickness; ++r) {
+        // 上边
+        int curr_y = y + r;
+        if (curr_y < height) {
+            int start = std::max(0, x);
+            int end = std::min(width, x + w + thickness);
+            for (int col = start; col < end; ++col) draw_pixel(curr_y, col);
+        }
+        
+        // 下边
+        curr_y = y + h - 1 - r;
+        if (curr_y >= 0) {
+            int start = std::max(0, x);
+            int end = std::min(width, x + w + thickness);
+            for (int col = start; col < end; ++col) draw_pixel(curr_y, col);
+        }
+    }
+
+    // 绘制左右边
+    for (int r = 0; r < thickness; ++r) {
+        int col_left = x + r;
+        int col_right = x + w - 1 - r;
+        
+        if (col_left >= width) break;
+        
+        for (int row = y_start; row < y_end; ++row) {
+            if (col_left >= 0) draw_pixel(row, col_left);
+            if (col_right >= 0 && col_right < width) draw_pixel(row, col_right);
+        }
+    }
+}
+
 //*======辅助函数：加载模型数据========*//
 static unsigned char* load_data(FILE* fp, size_t ofst, size_t sz)
 {
@@ -185,6 +253,11 @@ RkInference::~RkInference()
     }
     for (size_t i = 0; i < output_mems_.size(); i++) {
         if (output_mems_[i]) rknn_destroy_mem(ctx_, output_mems_[i]);
+    }
+
+    if (aligned_buf_) {
+        free(aligned_buf_);
+        aligned_buf_ = nullptr;
     }
 }
 
@@ -432,15 +505,90 @@ void RkInference::topic_callback(sensor_msgs::msg::Image::UniquePtr msg)
         for (const auto& det : detect_results_) {
             // 定义 RGA 矩形区域
             im_rect rect;
-            rect.x = (int)det.x;
-            rect.y = (int)det.y;
-            rect.width = (int)det.w;
-            rect.height = (int)det.h;
+            
+            // 严格限制坐标在图像范围内，避免 RGA 返回 -3 (IM_STATUS_ILLEGAL_PARAM)
+            int x = (int)det.x;
+            int y = (int)det.y;
+            int w = (int)det.w;
+            int h = (int)det.h;
+
+            // 1. 确保起点不小于 0
+            x = std::max(0, x);
+            y = std::max(0, y);
+
+            // 2. 确保宽高不越界
+            // 注意：width/height 是图像尺寸
+            w = std::min(w, (int)msg->width - x);
+            h = std::min(h, (int)msg->height - y);
+
+            // 3. 赋值给 rect
+            rect.x = x;
+            rect.y = y;
+            rect.width = w;
+            rect.height = h;
+
+            // 如果宽高无效，则跳过
+            if (w <= 0 || h <= 0) continue;
 
             // 调用 RGA 硬件绘制矩形框
             // 颜色: 0xFF0000 (Red), 线宽: 5
             // RGA 驱动会自动处理 NV12 格式的颜色转换
-            imrectangle(src, rect, 0xFF0000, 5);
+            int ret = imrectangle(src, rect, 0xFF0000, 5);
+            if (ret < 0) {
+                // 检查是否是因为对齐问题 (ret=-3 且地址未对齐)
+                uintptr_t addr = (uintptr_t)src.vir_addr;
+                bool is_page_aligned = (addr % 4096 == 0);
+
+                if (ret == IM_STATUS_ILLEGAL_PARAM && !is_page_aligned) {
+                    // === 解决方案：使用对齐的中转 Buffer (Copy -> RGA -> Copy) ===
+                    // 虽然这增加了 CPU 拷贝开销，但这是在无法控制上游 ROS 消息内存分配器的情况下，
+                    // 强制使用 RGA 硬件绘图的唯一方法。
+                    
+                    size_t img_size = msg->data.size();
+                    
+                    // 1. 懒加载分配对齐内存
+                    if (!aligned_buf_ || aligned_buf_size_ < img_size) {
+                        if (aligned_buf_) free(aligned_buf_);
+                        // 申请 4KB 对齐的内存
+                        int err = posix_memalign(&aligned_buf_, 4096, img_size);
+                        if (err != 0) {
+                            RCLCPP_ERROR(this->get_logger(), "posix_memalign 失败: %d", err);
+                            aligned_buf_ = nullptr;
+                        } else {
+                            aligned_buf_size_ = img_size;
+                            RCLCPP_INFO(this->get_logger(), "已分配 4KB 对齐缓冲: %zu bytes @ %p", aligned_buf_size_, aligned_buf_);
+                        }
+                    }
+
+                    if (aligned_buf_) {
+                        // 2. 拷贝数据到对齐内存 (Msg -> Aligned)
+                        memcpy(aligned_buf_, msg->data.data(), img_size);
+
+                        // 3. 构建新的 RGA Buffer
+                        rga_buffer_t aligned_src = src;
+                        aligned_src.vir_addr = aligned_buf_; // 使用对齐地址
+
+                        // 4. 再次尝试 RGA 绘图
+                        int ret_aligned = imrectangle(aligned_src, rect, 0xFF0000, 5);
+                        
+                        if (ret_aligned == 0) {
+                            // 5. 成功后拷贝回原消息 (Aligned -> Msg)
+                            memcpy(msg->data.data(), aligned_buf_, img_size);
+                            // 成功，跳过 CPU 回退
+                            continue; 
+                        } else {
+                            RCLCPP_WARN(this->get_logger(), "RGA 对齐后重试仍失败: %d", ret_aligned);
+                        }
+                    }
+                }
+
+                // 如果对齐修复也失败，或分配失败，则回退到 CPU 绘制
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, 
+                    "RGA imrectangle 失败 (ret=%d). 地址: %p (4K对齐: %s), 宽: %d, 高: %d, Stride: %d. 回退到 CPU.", 
+                    ret, src.vir_addr, is_page_aligned ? "YES" : "NO", src.width, src.height, src.wstride);
+                    
+                nv12_draw_rect(msg->data.data(), msg->width, msg->height, rect.x, rect.y, rect.width, rect.height, 5);
+            }
         }
     }
 

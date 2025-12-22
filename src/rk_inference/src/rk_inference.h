@@ -69,6 +69,10 @@ private:
     void* model_input_buf_ = nullptr;
     size_t model_input_size_ = 0;
 
+    // RGA 对齐缓冲 (用于解决 ROS 消息内存未对齐问题)
+    void* aligned_buf_ = nullptr;
+    size_t aligned_buf_size_ = 0;
+
     // 检测结果
     std::vector<DetectObject> detect_results_;
 };

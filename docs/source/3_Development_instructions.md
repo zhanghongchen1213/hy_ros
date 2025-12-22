@@ -1222,27 +1222,16 @@ RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，�
 
 ## 3. RTSP 推流与 Foxglove 可视化
 
-### 3.1 验证推流状态
-
 当 `rk_streamer` 正常运行后，它会主动将视频流推送到 `rtsp://127.0.0.1:8554/camera`。
-在 go2rtc 的管理界面 (http://<板卡 IP>:1984/) 中，你应该能看到名为 `camera` 的流自动出现。
+在网页输入 `http://192.168.22.219:1984/stream.html?src=camera` 即可查看推流视频。
 
-- 点击 `stream` 链接可直接在浏览器预览。
-- 如果流未出现，请检查 `rk_streamer` 日志是否有报错。
+```{figure} _static/image.png
+:alt: 测试结果
+:width: 100%
+:align: center
+```
 
-### 3.2 Foxglove Studio 可视化配置
-
-Foxglove 是一个强大的 ROS 数据可视化工具，支持通过 WebRTC 直接查看低延迟视频流。
-
-**Foxglove Studio 添加 WebRTC 视频面板**
-
-- 在布局中添加一个 **"Live Stream"** (或 "Webpage") 面板。
-- **URL 设置**：
-  - Foxglove 目前不直接支持原始 RTSP，但 go2rtc 提供了兼容的 WebRTC/MJPEG 接口。
-  - 推荐使用 MJPEG 流地址（兼容性最好）：
-    `http://<板卡IP>:1984/api/stream.mjpeg?src=camera`
-  - 或者尝试 WebRTC 接口（低延迟，需浏览器支持）：
-    `http://<板卡IP>:1984/webrtc.html?src=camera`
+---
 
 # 七、SLAM 部署
 

@@ -120,7 +120,7 @@ def generate_launch_description():
                         {'height': 1080},
                         {'fps': 30},
                         {'sub_topic': '/yolo/image_infer'}, # 订阅 rk_inference 发布的话题
-                        {'pipeline': 'appsrc name=source ! video/x-raw,format=NV12,width=1920,height=1080,framerate=30/1 ! videoconvert ! mpph264enc ! h264parse config-interval=-1 ! rtspclientsink location=rtsp://127.0.0.1:8554/camera protocols=tcp'}
+                        {'pipeline': 'appsrc name=source ! video/x-raw,format=NV12 ! videoconvert ! mpph264enc ! h264parse config-interval=-1 ! rtspclientsink location=rtsp://127.0.0.1:8554/camera protocols=tcp'}
                     ],
                     extra_arguments=[{'use_intra_process_comms': True}]
                 )

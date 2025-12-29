@@ -12,6 +12,8 @@
   <depend>launch_ros</depend>
 
   <!-- START添加依赖库 -->
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
   <depend>python3-serial</depend>
   <depend>pid_debug_interfaces</depend>
   <!-- END添加依赖库 -->

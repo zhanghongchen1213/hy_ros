@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import JointState, Joy
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped, Quaternion
 from std_msgs.msg import UInt16, UInt8, Float32
@@ -115,6 +115,7 @@ class UartNode(Node):
         self.motor_status_topic = self._require_str('pub_motor_status_topic')
         self.audio_status_topic = self._require_str('sub_audio_status_topic')
         self.motor_control_topic = self._require_str('sub_motor_control_topic')
+        self.joy_topic = self._require_str('sub_joy_topic')
 
         # 2. 通信资源初始化
         self._ser = None
@@ -122,6 +123,12 @@ class UartNode(Node):
         self._buf = bytearray()
         self._stop = threading.Event()
         self.send_queue = queue.Queue()
+        
+        # Joy Control State
+        self.joy_servo_a = 0.0
+        self.joy_servo_b = 0.0
+        self.joy_servo_c = 0.0
+        self.last_buttons = []
         
         # 3. ROS 接口
         # [Pub] 上行
@@ -135,6 +142,8 @@ class UartNode(Node):
             UInt8, self.audio_status_topic, self._on_audio_status, 10)
         self.sub_motor_control = self.create_subscription(
             MotorControl, self.motor_control_topic, self._on_motor_control, 10)
+        self.sub_joy = self.create_subscription(
+            Joy, self.joy_topic, self._on_joy, 10)
         
         # 4. 启动线程
         self._open()
@@ -158,6 +167,69 @@ class UartNode(Node):
         packet.timestamp = int(time.time() * 1000) & 0xFFFFFFFF
         packet.end_flag = UartDownlinkPacket.END_FLAG
         
+        self.send_queue.put(packet)
+
+    def _on_joy(self, msg: Joy):
+        """
+        ROS 回调：收到手柄数据，解析并控制
+        """
+        # 1. 解析 Axes (前4个)
+        # 用户需求：前两个配置给 linear (L84), 后两个配置给 angular (L85)
+        # 采用标准映射：axes[1] -> linear, axes[3] -> angular
+        linear = 0.0
+        angular = 0.0
+        if len(msg.axes) >= 4:
+            linear = msg.axes[1] * 80.0  # Max 80.0 m/s
+            angular = msg.axes[3] * 5.0 # Max 5.0 rad/s
+        
+        # 2. 解析 Buttons (前6个)
+        if len(self.last_buttons) != len(msg.buttons):
+            self.last_buttons = [0] * len(msg.buttons)
+            
+        def check_press(idx):
+            if idx < len(msg.buttons):
+                return msg.buttons[idx] == 1 and self.last_buttons[idx] == 0
+            return False
+
+        # Button 0 (1st): Servo A + 5
+        if check_press(0): self.joy_servo_a += 5.0
+        # Button 1 (2nd): Servo A - 5
+        if check_press(1): self.joy_servo_a -= 5.0
+        
+        # Button 2 (3rd): Servo B + 5
+        if check_press(2): self.joy_servo_b += 5.0
+        # Button 3 (4th): Servo B - 5
+        if check_press(3): self.joy_servo_b -= 5.0
+        
+        # Button 4 (5th): Servo C + 5
+        if check_press(4): self.joy_servo_c += 5.0
+        # Button 5 (6th): Servo C - 5
+        if check_press(5): self.joy_servo_c -= 5.0
+        
+        self.last_buttons = list(msg.buttons)
+        
+        # 3. 发送下行包
+        packet = UartDownlinkPacket()
+        packet.start_flag = UartDownlinkPacket.START_FLAG
+        packet.audio_stream_flag = 0
+        
+        packet.linear_vel = float(linear)
+        packet.angular_vel = float(angular)
+        
+        packet.servo_a_angle = float(self.joy_servo_a)
+        packet.servo_b_angle = float(self.joy_servo_b)
+        packet.servo_c_angle = float(self.joy_servo_c)
+        
+        packet.timestamp = int(time.time() * 1000) & 0xFFFFFFFF
+        packet.end_flag = UartDownlinkPacket.END_FLAG
+        
+        # DEBUG: 打印调试信息
+        self.get_logger().debug(
+            f"[Joy Debug] Linear={packet.linear_vel:.2f}, Angular={packet.angular_vel:.2f}, "
+            f"Servo A={packet.servo_a_angle:.2f}, Servo B={packet.servo_b_angle:.2f}, Servo C={packet.servo_c_angle:.2f}"
+        )
+        
+        # 暂时注释掉串口下发，等待调试确认
         self.send_queue.put(packet)
 
     def _on_motor_control(self, msg: MotorControl):

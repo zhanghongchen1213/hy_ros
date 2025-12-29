@@ -438,22 +438,27 @@ export LD_LIBRARY_PATH=./lib
 
 1. 安装必要的 python 库
 
-> **注意：** 主机侧和端侧均需要安装
+> **注意：** 主机侧和端侧均需要安装,音色管理创建等操作可以在主机侧进行
 >
 > ```shell
 > # 安装异步 http 库和 websockets 库
 > sudo apt-get install python3-aiohttp python3-websockets
 > ```
 
-2. 录制 15s 任意文本音频, 并转换为 base64 编码的 mp3 格式
+2. 复刻本人音色，需录制 15s 任意文本音频, 并转换为 base64 编码的 mp3 格式
 
-> - [在线转换工具](https://base64.guru/converter/encode/audio/mp3)
+> - [在线转换工具](https://www.toolfk.com/en/tools/audio-to-base64.html)
 > - 下载 base64.txt 文件,替换`hy_ros/src/audio_tts/audio_tts/base64.txt`
 
-3. 获取 API key
+3. 复刻机器人音色，可直接使用`hy_ros/src/audio_tts/audio_tts/base64_robot.txt`
+
+   > - 机器人音色可以直接修改文件`hy_ros/src/audio_tts/audio_tts/tts_api.py` 中的`base64_file_path` 变量为`base64_robot.txt`
+
+4. 获取 API key
 
 > - 参考[百度大模型应用创建](https://ai.baidu.com/ai-doc/REFERENCE/Bkru0l60m)创建应用配置百度智能云 api 密钥，Server Key
 > - 更新到秘钥到`hy_ros/src/audio_tts/launch/audio_tts_launch.py` 文件中和`tts_api.py` 文件中
+> - 设置`tts_api.py` 文件中的`run_create_voice` 变量为 True, 表示在运行时创建 Voice ID
 
 4. 创建 Voice ID
 
@@ -461,7 +466,13 @@ export LD_LIBRARY_PATH=./lib
 >
 > - 在 `hy_ros/src/audio_tts/audio_tts` 目录下运行`python3 tts_api.py`
 > - 查看并记录返回的 Voice ID
-> - 更新到 `hy_ros/src/audio_tts/launch/audio_tts_launch.py` 文件中
+> - 更新秘钥、音色 ID 到 `hy_ros/src/audio_tts/launch/audio_tts_launch.py` 文件中
+
+4. 音色管理
+   > - 设置`tts_api.py` 文件中的`run_tts` 变量为 True, 表示在运行时使用音色复刻 TTS 进行测试
+   > - 设置`tts_api.py` 文件中的`run_list_voice` 变量为 True, 表示在运行时查看 Voice ID 列表
+   > - 设置`tts_api.py` 文件中的`run_query_detail` 变量为 True, 表示在运行时查看 Voice ID 详情
+   > - 设置`tts_api.py` 文件中的`run_delete_voice` 变量为 True, 表示在运行时删除 Voice ID
 
 ---
 
@@ -1220,7 +1231,7 @@ RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，�
 
 ---
 
-## 3. RTSP 推流与 Foxglove 可视化
+## 3. RTSP 推流
 
 当 `rk_streamer` 正常运行后，它会主动将视频流推送到 `rtsp://127.0.0.1:8554/camera`。
 在网页输入 `http://192.168.22.219:1984/stream.html?src=camera` 即可查看推流视频。
@@ -1234,5 +1245,176 @@ RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，�
 ---
 
 # 七、SLAM 部署
+
+本节介绍如何在端侧 RK3588S 上部署 SLAM 建图功能，包括在线建图、地图发布与雷达数据裁剪。
+
+## 1. 安装依赖
+
+在端侧（RK3588S）执行以下命令安装必要功能包：
+
+```bash
+sudo apt update
+sudo apt install -y ros-humble-slam-toolbox ros-humble-navigation2 \
+    ros-humble-nav2-bringup ros-humble-laser-filters
+```
+
+## 2. 配置功能包
+
+为了实现“在线建图”、“发布 map->odom 变换”以及“雷达后方裁剪”的功能，需进行以下配置。
+
+### 2.1 雷达数据裁剪 (Laser Filters)
+
+为解决机器人后方遮挡问题（例如自身结构遮挡），需配置 `laser_filters` 对雷达数据进行裁剪。
+新建配置文件 `src/hy_slam/config/laser_filter.yaml`：
+
+```yaml
+scan_to_scan_filter_chain:
+  ros__parameters:
+    filter1:
+      name: rear_box_filter
+      type: laser_filters/LaserScanBoxFilter
+      params:
+        box_frame: base_link
+        max_x: -0.1
+        min_x: -1.0
+        max_y: 0.3
+        min_y: -0.3
+        max_z: 1.0
+        min_z: -1.0
+        invert: false
+```
+
+### 2.2 SLAM 配置 (Slam Toolbox)
+
+配置 `slam_toolbox` 进行在线建图与地图发布。`slam_toolbox` 在 mapping 模式下会自动发布 `map` -> `odom` 的 TF 变换。
+新建配置文件 `src/hy_slam/config/mapper_params_online_async.yaml`
+
+```yaml
+slam_toolbox:
+  ros__parameters:
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_link
+    scan_topic: /scan_filtered # 注意：订阅经过裁剪后的雷达话题
+    mode: mapping
+
+    # 更多参数参考模板...
+    use_scan_matching: true
+    map_update_interval: 5.0
+    resolution: 0.05
+```
+
+### 2.3 定位参数配置 (Slam Toolbox)
+
+配置 `slam_toolbox` 进行定位。`slam_toolbox` 在 localization 模式下会根据静态地图与实时雷达数据进行匹配，发布 `map` -> `odom` 的 TF 变换。
+新建配置文件 `src/hy_slam/config/mapper_params_localization.yaml`
+
+```yaml
+slam_toolbox:
+  ros__parameters:
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_link
+    scan_topic: /scan_filtered # 注意：订阅经过裁剪后的雷达话题
+    mode: localization
+
+    # 更多参数参考模板...
+    use_scan_matching: true
+    map_update_interval: 5.0
+    resolution: 0.05
+```
+
+## 3. SLAM 在线建图/存图
+
+- `slam.launch.py` 启动 SLAM 建图功能，实现在线建图。调用`save_map.sh`脚本保存地图。
+- `localization.launch.py` 启动雷达数据裁剪+定位功能，根据静态地图与实时雷达数据进行匹配，发布 `map` -> `odom` 的 TF 变换。
+- `laser_filters.launch.py` 仅启动雷达数据裁剪功能，将 `/scan` 话题裁剪为 `/scan_filtered`，依赖 Nav2 功能包的 AMCL + Map Server，发布 `map` -> `odom` 的 TF 变换。
+
+1. 启动雷达功能包
+
+```bash
+cd ~/hy_linux/nfs/hy_ros
+
+# 注意：若未配置udev规则，请先执行：
+sudo bash src/ldlidar_driver_ros2/scripts/Ldlidar_udev.sh
+
+# 1. 编译
+colcon build --packages-select ldlidar_driver_ros2
+
+# 2. 运行雷达，确保发布话题为 /scan，frame_id 配置为 radar_Link
+source install/setup.bash
+ros2 launch ldlidar_driver_ros2 ldlidar_driver.launch.py
+```
+
+2. 启动 SLAM 建图功能
+
+```bash
+# 编译
+cd ~/hy_linux/nfs/hy_ros
+colcon build --packages-select hy_slam
+
+# 运行
+source install/setup.bash
+ros2 launch hy_slam slam.launch.py
+```
+
+3. 保存地图
+
+**重要**：请在 **`slam.launch.py` 仍在运行**时执行保存脚本。若先终止 SLAM 程序，内存中的地图数据将丢失，导致无法保存。
+
+完成建图后，打开一个新的终端执行以下脚本：
+
+```bash
+# 默认保存为 my_map
+cd ~/hy_linux/nfs/hy_ros
+./src/hy_slam/scripts/save_map.sh
+
+# 或指定地图名
+# ./src/hy_slam/scripts/save_map.sh room_1
+```
+
+地图将保存至 `install/hy_slam/share/hy_slam/map/` 目录下（包含 `.pgm` 和 `.yaml` 两个文件）。
+
+## 4. 可视化调试 (Foxglove)
+
+使用 Foxglove Studio 查看实时建图效果。
+
+1.  **客户端连接**：
+
+    - 在 PC 上打开 Foxglove Studio。
+    - 选择 **Open Connection** -> **Foxglove WebSocket**。
+    - 地址输入：`ws://<机器人IP>:8765`。
+
+2.  **配置面板**：
+    - 添加 **2D Panel**。
+    - 在左侧 Topics 勾选：
+      - `/map` (SLAM 地图)
+      - `/scan` (原始雷达)
+      - `/scan_filtered` (裁剪后雷达)
+      - TF 树 (确保 `map` -> `odom` -> `base_link` -> `radar_Link` 连通)。
+
+## 5. 定位模式
+
+若已构建地图，可切换至纯定位模式运行（不再更新地图，仅进行定位）：
+
+1.  **方式一：使用 slam_toolbox 进行定位**
+    该模式下，`slam_toolbox` 会加载静态地图，并将实时雷达数据与地图匹配，发布 `map` -> `odom` 变换。
+
+    ```bash
+    # 启动定位模式（默认加载 my_map）
+    ros2 launch hy_slam localization.launch.py
+    ```
+
+2.  **方式二：使用 Nav2 (AMCL) 进行定位**（推荐用于导航）
+    若后续使用 Nav2 导航栈，通常由 `amcl` 节点负责定位，`map_server` 负责发布地图。此时 `hy_slam` 仅需提供雷达数据裁剪。
+
+    - **步骤 1**：启动雷达滤波器（仅发布 /scan_filtered）
+      ```bash
+      ros2 launch hy_slam laser_filter_only.launch.py
+      ```
+    - **步骤 2**：启动 Nav2 (AMCL + Map Server)
+      _(需在 Nav2 启动文件中配置加载 `install/hy_slam/share/hy_slam/map/my_map.yaml`)_
+
+**注意**：无论哪种方式，定位模式下**必须**发布雷达数据 (`/scan_filtered`)。
 
 # 八、Nav2 部署

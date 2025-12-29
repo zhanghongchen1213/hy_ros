@@ -1,0 +1,15 @@
+# 激光雷达数据过滤配置文件
+scan_to_scan_filter_chain:
+  ros__parameters:
+    filter1:
+      name: rear_box_filter
+      type: laser_filters/LaserScanBoxFilter
+      params:
+        box_frame: base_link
+        max_x: -0.1
+        min_x: -1.0
+        max_y: 0.3
+        min_y: -0.3
+        max_z: 1.0
+        min_z: -1.0
+        invert: false # Remove points INSIDE the box

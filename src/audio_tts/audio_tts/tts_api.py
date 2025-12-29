@@ -40,7 +40,7 @@ class BaiduTTSClient:
                     self.logger.error(f"获取 Access Token 失败: {data}")
                     raise Exception("百度鉴权失败")
 
-    async def synthesize(self, text, on_audio_chunk, spd=5, pit=5, vol=5, aue=3, lang="zh", dialect=""):
+    async def synthesize(self, text, on_audio_chunk, spd=7, pit=5, vol=5, aue=3, lang="zh", dialect=""):
         """
         调用百度流式 TTS (复刻音色版)
         :param text: 要合成的文本
@@ -149,6 +149,88 @@ class BaiduTTSClient:
                     self.logger.error(f"音色创建失败: {data}")
                     raise Exception(f"Create Voice Failed: {data}")
 
+    async def query_voice_list(self, page=1, per_page=10):
+        """
+        查询音色列表
+        :param page: 页码，默认1
+        :param per_page: 每页数量，默认10
+        :return: 音色列表数据
+        """
+        await self._refresh_token()
+        
+        url = "https://aip.baidubce.com/rest/2.0/speech/publiccloudspeech/v1/voice/clone/list"
+        params = {
+            "access_token": self.access_token,
+            "page": page,
+            "per_page": per_page
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, params=params) as resp:
+                data = await resp.json()
+                if resp.status == 200 and data.get("status") == 0:
+                    self.logger.info(f"查询音色列表成功: {data}")
+                    return data.get("data", {})
+                else:
+                    self.logger.error(f"查询音色列表失败: {data}")
+                    raise Exception(f"Query Voice List Failed: {data}")
+
+    async def query_voice_detail(self, voice_id):
+        """
+        查询音色详情 (通过列表过滤实现)
+        :param voice_id: 音色ID
+        :return: 音色详情字典或None
+        """
+        # 由于API文档未明确提供详情接口，此处通过遍历列表实现
+        # 注意：如果音色在很后面的页码，可能需要遍历多次，这里仅简单实现查询第一页或假设用户知道在哪一页
+        # 或者我们可以循环查询直到找到。为了效率，先查第一页。
+        # 实际生产中应确认是否有直接详情接口。
+        
+        # 尝试查询前几页
+        for p in range(1, 6):
+            data = await self.query_voice_list(page=p, per_page=20)
+            voice_list = data.get("items", [])
+            if not voice_list:
+                break
+            
+            for voice in voice_list:
+                # 假设返回的数据中有 voice_id 字段
+                if str(voice.get("voice_id")) == str(voice_id):
+                    return voice
+            
+            # 如果当前页不满，说明没有更多数据了
+            if len(voice_list) < 20:
+                break
+                
+        self.logger.warning(f"未找到音色ID: {voice_id}")
+        return None
+
+    async def delete_voice(self, voice_id):
+        """
+        删除音色
+        :param voice_id: 音色ID
+        :return: 成功返回True
+        """
+        await self._refresh_token()
+        
+        # 推测的删除接口地址，根据 create/list 命名规范推断
+        url = "https://aip.baidubce.com/rest/2.0/speech/publiccloudspeech/v1/voice/clone/delete"
+        params = {
+            "access_token": self.access_token,
+            "voice_id": voice_id
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, params=params) as resp:
+                data = await resp.json()
+                if resp.status == 200 and data.get("status") == 0:
+                    self.logger.info(f"删除音色成功: {voice_id}")
+                    return True
+                else:
+                    self.logger.error(f"删除音色失败: {data}")
+                    raise Exception(f"Delete Voice Failed: {data}")
+
+
 if __name__ == "__main__":
     async def test_main():
         import os
@@ -159,19 +241,23 @@ if __name__ == "__main__":
         # ==========================================
         # 请在此处直接修改参数进行测试
         # ==========================================
-        api_key = ""      # 填入百度 API Key
-        secret_key = ""   # 填入百度 Secret Key
-        voice_id = ""     # 填入 Voice ID
-        text = "我不是 Butter Robot，我是 Butter Robot 2.0，我是一个基于大模型的语音合成系统。"
+        api_key = "fUc8LIoXM4NEkJ4JLCBnTYIM"      # 填入百度 API Key
+        secret_key = "e5UgkHCwyclrGziVUik2PFWbhn2eu9Hb"   # 填入百度 Secret Key
+        voice_id = "107739"     # 填入 Voice ID
+        text = "What is my perpose? Oh, my god! I am not a programmed for friendship!"
         output_file = "test_output.mp3"
         
         # 创建音色参数
-        voice_name = "黄油机器人"
-        voice_desc = "测试复刻音色"
-        base64_file_path = "/mnt/nfs/hy_ros/src/audio_tts/audio_tts/base64.txt"
+        voice_name = "机器人音色"
+        voice_desc = "机器人音色复刻"
+        base64_file_path = "/home/k/hy_linux/nfs/hy_ros/src/audio_tts/audio_tts/base64_robot.txt"
         
-        # 设置模式：True 为创建音色，False 为测试 TTS 合成
-        run_create_voice = True
+        # 设置模式：
+        run_create_voice = False  # True 为创建音色
+        run_tts = True # True 为测试 TTS 合成
+        run_list_voice = False # True 为查询音色列表
+        run_query_detail = False # True 为查询音色详情
+        run_delete_voice = False # True 为删除音色
         
         # ==========================================
         
@@ -195,11 +281,41 @@ if __name__ == "__main__":
                 
             except Exception as e:
                 print(f"\n[失败] 创建音色发生错误: {e}")
-        else:
+        
+        if run_list_voice:
+            print("\n正在查询音色列表...")
+            try:
+                data = await client.query_voice_list()
+                print(f"音色列表: {json.dumps(data, ensure_ascii=False, indent=2)}")
+            except Exception as e:
+                print(f"查询列表失败: {e}")
+
+        if run_query_detail and voice_id:
+            print(f"\n正在查询音色详情: {voice_id}")
+            try:
+                detail = await client.query_voice_detail(voice_id)
+                if detail:
+                    print(f"音色详情: {json.dumps(detail, ensure_ascii=False, indent=2)}")
+                else:
+                    print("未找到该音色")
+            except Exception as e:
+                print(f"查询详情失败: {e}")
+
+        if run_delete_voice and voice_id:
+             print(f"\n正在删除音色: {voice_id}")
+             try:
+                 success = await client.delete_voice(voice_id)
+                 if success:
+                     print("删除成功")
+             except Exception as e:
+                 print(f"删除失败: {e}")
+
+        if run_tts:
              # 测试 TTS 合成
              if not voice_id:
                  print("错误：TTS 测试需要提供 voice_id")
                  return
+
                  
              print(f"\n开始合成文本: {text}")
              print(f"目标输出文件: {output_file}")
@@ -211,7 +327,7 @@ if __name__ == "__main__":
                          f.write(chunk)
                          print(".", end="", flush=True)
                          
-                     await client.synthesize(text, save_audio, dialect="zh-CN-henan")
+                     await client.synthesize(text, save_audio)
                      
                  print(f"\n\n合成完成！音频已保存至: {os.path.abspath(output_file)}")
              except Exception as e:

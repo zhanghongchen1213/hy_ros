@@ -45,7 +45,8 @@ def generate_launch_description():
         {'laser_scan_dir': True},
         {'enable_angle_crop_func': False},
         {'angle_crop_min': 0.0},
-        {'angle_crop_max': 0.0}
+        {'angle_crop_max': 0.0},
+        {'angle_offset': -90.0} # 角度偏移量，在原安装位置需要偏移-90°，矫正方向
       ]
     )
   ])

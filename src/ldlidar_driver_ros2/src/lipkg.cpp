@@ -62,7 +62,7 @@ uint8_t CalCRC8(const uint8_t *data, uint16_t data_len) {
 }
 
 LiPkg::LiPkg(std::string frame_id, bool laser_scan_dir, bool enable_angle_crop_func,
-  double angle_crop_min, double angle_crop_max)
+  double angle_crop_min, double angle_crop_max, double angle_offset)
     : frame_id_(frame_id),
       timestamp_(0),
       speed_(0),
@@ -72,7 +72,8 @@ LiPkg::LiPkg(std::string frame_id, bool laser_scan_dir, bool enable_angle_crop_f
       laser_scan_dir_(laser_scan_dir),
       enable_angle_crop_func_(enable_angle_crop_func),
       angle_crop_min_(angle_crop_min),
-      angle_crop_max_(angle_crop_max) {
+      angle_crop_max_(angle_crop_max),
+      angle_offset_(angle_offset) {
 
 }
 
@@ -231,8 +232,8 @@ void LiPkg::ToLaserscan(std::vector<PointData> src) {
     unsigned int beam_size = static_cast<unsigned int>(ceil((angle_max - angle_min) / angle_increment));
     output_.header.stamp = clock.now();
     output_.header.frame_id = frame_id_;
-    output_.angle_min = angle_min;
-    output_.angle_max = angle_max;
+    output_.angle_min = angle_min + ANGLE_TO_RADIAN(angle_offset_);
+    output_.angle_max = angle_max + ANGLE_TO_RADIAN(angle_offset_);
     output_.range_min = range_min;
     output_.range_max = range_max;
     output_.angle_increment = angle_increment;
@@ -266,7 +267,7 @@ void LiPkg::ToLaserscan(std::vector<PointData> src) {
       }
 
       float angle = ANGLE_TO_RADIAN(dir_angle); // lidar angle unit form degree transform to radian
-      unsigned int index = static_cast<unsigned int>((angle - output_.angle_min) / output_.angle_increment);
+      unsigned int index = static_cast<unsigned int>((angle - angle_min) / output_.angle_increment);
       if (index < beam_size) {
         // If the current content is Nan, it is assigned directly
         if (std::isnan(output_.ranges[index])) {

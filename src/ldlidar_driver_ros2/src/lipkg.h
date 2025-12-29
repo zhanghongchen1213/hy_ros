@@ -57,7 +57,7 @@ typedef struct __attribute__((packed)) {
 class LiPkg {
  public:
   LiPkg(std::string frame_id, bool laser_scan_dir, bool enable_angle_crop_func,
-  double angle_crop_min, double angle_crop_max);
+  double angle_crop_min, double angle_crop_max, double angle_offset);
   // get Lidar spin speed (Hz)
   double GetSpeed(void); 
   // get time stamp of the packet
@@ -94,6 +94,7 @@ class LiPkg {
   bool enable_angle_crop_func_;
   double angle_crop_min_;
   double angle_crop_max_;
+  double angle_offset_;
   LiDARFrameTypeDef pkg;
   std::vector<uint8_t> data_tmp_;
   std::array<PointData, POINT_PER_PACK> one_pkg_;

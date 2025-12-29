@@ -1335,8 +1335,9 @@ slam_toolbox:
 ```bash
 cd ~/hy_linux/nfs/hy_ros
 
-# 注意：若未配置udev规则，请先执行：
+# 注意：若未配置udev规则，请先执行，然后重新插拔雷达
 sudo bash src/ldlidar_driver_ros2/scripts/Ldlidar_udev.sh
+# 执行后运行ls -l /dev/ldlidar_serial,确认是否有 /dev/ldlidar_serial 设备文件,成功则继续向后执行
 
 # 1. 编译
 colcon build --packages-select ldlidar_driver_ros2
@@ -1393,6 +1394,28 @@ cd ~/hy_linux/nfs/hy_ros
       - `/scan_filtered` (裁剪后雷达)
       - TF 树 (确保 `map` -> `odom` -> `base_link` -> `radar_Link` 连通)。
 
+--- 
+
+/scan雷达数据可视化
+```{figure} _static/{4DC3D9CE-BEDD-4422-918D-975FD294427A}.png
+:alt: /scan雷达结果
+:width: 100%
+:align: center
+```
+
+---
+
+/map地图可视化
+```{figure} _static/{4DC3D9CE-BEDD-4422-918D-975FD294427A}.png
+:alt: /map地图结果
+:width: 100%
+:align: center
+```
+
+
+
+
+---
 ## 5. 定位模式
 
 若已构建地图，可切换至纯定位模式运行（不再更新地图，仅进行定位）：

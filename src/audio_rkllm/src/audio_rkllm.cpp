@@ -40,6 +40,9 @@ RKLLMNode::RKLLMNode()
         camera_flip_ = this->declare_parameter<bool>("camera_flip");
         enable_multimodal_ = this->declare_parameter<bool>("enable_multimodal");
         
+        // 语言控制参数
+        force_english_ = this->declare_parameter<bool>("force_english");
+
         // 多模态特殊Token配置
         img_start_token_ = this->declare_parameter<std::string>("img_start_token");
         img_end_token_ = this->declare_parameter<std::string>("img_end_token");
@@ -348,6 +351,11 @@ std::string RKLLMNode::run_inference(const LLMInstruction& instruction)
         prompt = instruction.text_content;
     }
     
+    // 如果启用强制英文输出，追加指令
+    if (force_english_) {
+        prompt += " Please answer in English.";
+    }
+
     input.prompt_input = (char*)prompt.c_str();
     // 参考 test.cpp:197
     input.role = "user"; // 或者是 "system" 等，视模型模板而定

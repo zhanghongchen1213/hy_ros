@@ -98,6 +98,7 @@ private:
 
     bool camera_flip_;
     bool enable_multimodal_; // 是否启用多模态功能
+    bool force_english_;     // 是否强制输出英文
     std::string image_save_path_ = "/tmp/capture.jpg";
     
     // 模型特定 token

@@ -47,6 +47,9 @@ def generate_launch_description():
                     # 摄像头数据
                     'camera_flip': False,  # 图像翻转参数：True: 保持原始方向 (正)，False: 旋转180度 (反)
                     'enable_multimodal': False, # 是否开启多模态 (True: 开启并尝试加载视觉模型, False: 仅纯文本)
+                    
+                    # 输出语言控制
+                    'force_english': True, # True: 强制 LLM 输出英文; False: 保持默认 (中文)
                 }
             ],
         )

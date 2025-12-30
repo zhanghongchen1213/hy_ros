@@ -16,6 +16,8 @@ def generate_launch_description():
                     'baud': 460800,
                     'pub_chat_topic': '/uart/chat_gpt_count',
                     'pub_motor_status_topic': '/uart/motor_status',
+                    'pub_wheel_odom_topic': '/uart/wheel_odom',
+                    'pub_imu_data_topic': '/uart/imu_data',
                     'sub_audio_status_topic': '/uart/audio_stream_flag', # 订阅音频状态
                     'sub_motor_control_topic': '/uart/motor_control',  # 订阅键盘控制
                     'sub_joy_topic': '/joy',  # 订阅游戏手柄控制

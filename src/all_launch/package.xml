@@ -12,9 +12,9 @@
 
   <!-- START添加所有需要的launch文件的依赖 -->
   <exec_depend>ament_index_python</exec_depend>
-   <!-- 串口相关 
+   <!-- 串口相关 -->
   <exec_depend>uart</exec_depend>
-  -->
+  <exec_depend>ekf_odom</exec_depend>
   <exec_depend>butter_robot_description</exec_depend>
   <!-- 音频相关 -->
   <!-- 音频相关

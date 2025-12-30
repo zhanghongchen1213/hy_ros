@@ -1,8 +1,8 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import JointState, Joy
-from tf2_ros import TransformBroadcaster
-from geometry_msgs.msg import TransformStamped, Quaternion
+from sensor_msgs.msg import JointState, Joy, Imu
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Quaternion
 from std_msgs.msg import UInt16, UInt8, Float32
 from geometry_msgs.msg import Twist
 from pid_debug_interfaces.msg import MotorControl, MotorStatus
@@ -28,20 +28,28 @@ class UartUplinkPacket(ctypes.LittleEndianStructure):
         ("chat_gpt_count", ctypes.c_uint16),
         
         # --- 电机与PID状态 (调试用) ---
-        ("left_target_speed", ctypes.c_float),  # 左电机目标速度
-        ("right_target_speed", ctypes.c_float), # 右电机目标速度
-        ("left_actual_speed", ctypes.c_float),  # 左电机实际速度
-        ("right_actual_speed", ctypes.c_float), # 右电机实际速度
-        ("left_kp", ctypes.c_float),            # 左电机PID比例系数
-        ("left_ki", ctypes.c_float),            # 左电机PID积分系数
-        ("left_kd", ctypes.c_float),            # 左电机PID微分系数
-        ("right_kp", ctypes.c_float),           # 右电机PID比例系数
-        ("right_ki", ctypes.c_float),           # 右电机PID积分系数
-        ("right_kd", ctypes.c_float),           # 右电机PID微分系数
+        ("left_target_speed", ctypes.c_float),
+        ("right_target_speed", ctypes.c_float),
+        ("left_actual_speed", ctypes.c_float),
+        ("right_actual_speed", ctypes.c_float),
+        ("left_kp", ctypes.c_float),
+        ("left_ki", ctypes.c_float),
+        ("left_kd", ctypes.c_float),
+        ("right_kp", ctypes.c_float),
+        ("right_ki", ctypes.c_float),
+        ("right_kd", ctypes.c_float),
 
         # --- 里程计与姿态 (用于SLAM/Nav/RVIZ) ---
-        ("position_x", ctypes.c_float),  # 位置 X (mm)
-        ("position_y", ctypes.c_float),  # 位置 Y (mm)
+        ("position_x", ctypes.c_float),  # m
+        ("position_y", ctypes.c_float),  # m
+        ("theta_wheel", ctypes.c_float), # rad
+        ("linear_vel_x", ctypes.c_float), # m/s
+        ("angular_vel_wheel", ctypes.c_float), # rad/s
+
+        # --- IMU 传感器部分 ---
+        ("gyro_x", ctypes.c_float),
+        ("gyro_y", ctypes.c_float),
+        ("gyro_z", ctypes.c_float),
 
         # 姿态四元数 (用于数字孪生)
         ("q_w", ctypes.c_float),
@@ -113,6 +121,8 @@ class UartNode(Node):
         self.baud = self._require_int('baud')
         self.chat_topic = self._require_str('pub_chat_topic')
         self.motor_status_topic = self._require_str('pub_motor_status_topic')
+        self.wheel_odom_topic = self._require_str('pub_wheel_odom_topic')
+        self.imu_data_topic = self._require_str('pub_imu_data_topic')
         self.audio_status_topic = self._require_str('sub_audio_status_topic')
         self.motor_control_topic = self._require_str('sub_motor_control_topic')
         self.joy_topic = self._require_str('sub_joy_topic')
@@ -135,7 +145,9 @@ class UartNode(Node):
         self.pub_chat = self.create_publisher(UInt16, self.chat_topic, 10)
         self.pub_motor_status = self.create_publisher(MotorStatus, self.motor_status_topic, 10)
         self.pub_joint_state = self.create_publisher(JointState, 'joint_states', 10)
-        self.tf_broadcaster = TransformBroadcaster(self)
+        
+        self.pub_odom = self.create_publisher(Odometry, self.wheel_odom_topic, 10)
+        self.pub_imu = self.create_publisher(Imu, self.imu_data_topic, 10)
         
         # [Sub] 下行
         self.sub_audio_status = self.create_subscription(
@@ -179,8 +191,8 @@ class UartNode(Node):
         linear = 0.0
         angular = 0.0
         if len(msg.axes) >= 4:
-            linear = msg.axes[1] * 80.0  # Max 80.0 m/s
-            angular = msg.axes[3] * 5.0 # Max 5.0 rad/s
+            linear = msg.axes[1] * 0.11  # Max 0.11 m/s
+            angular = msg.axes[3] * 1.76 # Max 1.76 rad/s
         
         # 2. 解析 Buttons (前6个)
         if len(self.last_buttons) != len(msg.buttons):
@@ -361,9 +373,13 @@ class UartNode(Node):
                 packet_bytes = bytes(b[:packet_size])
                 packet = UartUplinkPacket.from_buffer_copy(packet_bytes)
                 
+                # 获取当前时间戳，用于同步
+                current_time = self.get_clock().now().to_msg()
+                
                 # 发布话题
                 self.pub_chat.publish(UInt16(data=packet.chat_gpt_count))
                 
+                # 1. 发布 MotorStatus (电机状态，用于PID调试)
                 status_msg = MotorStatus()
                 status_msg.left_target_speed = packet.left_target_speed
                 status_msg.right_target_speed = packet.right_target_speed
@@ -377,9 +393,9 @@ class UartNode(Node):
                 status_msg.right_kd = packet.right_kd
                 self.pub_motor_status.publish(status_msg)
                 
-                # 2. 发布 JointState (关节状态)
+                # 2. 发布 JointState (关节状态)，用于更新机器人模型
                 joint_msg = JointState()
-                joint_msg.header.stamp = self.get_clock().now().to_msg()
+                joint_msg.header.stamp = current_time
                 joint_msg.name = ['right_arm_joint', 'left_arm_joint', 'spine_joint'] 
                 # int16=30 -> 30度 -> 30 * (PI/180) rad
                 scale = math.pi / 180.0
@@ -390,24 +406,57 @@ class UartNode(Node):
                 ]
                 self.pub_joint_state.publish(joint_msg)
 
-                # 3. 发布 TF (里程计与姿态)
-                t = TransformStamped()
-                t.header.stamp = self.get_clock().now().to_msg()
-                t.header.frame_id = 'odom'
-                t.child_frame_id = 'base_link'
+                # 3. 发布 Odometry (/uart/wheel_raw)
+                odom_msg = Odometry()
+                odom_msg.header.stamp = current_time
+                odom_msg.header.frame_id = "odom"
+                odom_msg.child_frame_id = "base_link"
                 
-                # 位置 (mm -> m)
-                t.transform.translation.x = float(packet.position_x) / 1000.0
-                t.transform.translation.y = float(packet.position_y) / 1000.0
-                t.transform.translation.z = 0.0
+                # 位置 (m) 
+                odom_msg.pose.pose.position.x = float(packet.position_x)
+                odom_msg.pose.pose.position.y = float(packet.position_y)
+                odom_msg.pose.pose.position.z = 0.0
+                
+                # 姿态 (Theta -> Quaternion)
+                # theta_wheel is rad
+                half_theta = float(packet.theta_wheel) * 0.5
+                odom_msg.pose.pose.orientation.z = math.sin(half_theta)
+                odom_msg.pose.pose.orientation.w = math.cos(half_theta)
+                
+                # 速度
+                odom_msg.twist.twist.linear.x = float(packet.linear_vel_x)
+                odom_msg.twist.twist.angular.z = float(packet.angular_vel_wheel)
+                
+                self.pub_odom.publish(odom_msg)
+
+                # 4. 发布 IMU (/uart/imu_data)
+                imu_msg = Imu()
+                imu_msg.header.stamp = current_time
+                imu_msg.header.frame_id = "base_link"
+                
+                # 角速度 (rad/s)
+                imu_msg.angular_velocity.x = float(packet.gyro_x)
+                imu_msg.angular_velocity.y = float(packet.gyro_y)
+                imu_msg.angular_velocity.z = -float(packet.gyro_z) # 取反适配 ROS 坐标系
                 
                 # 姿态 (四元数)
-                t.transform.rotation.w = float(packet.q_w)
-                t.transform.rotation.x = float(packet.q_x)
-                t.transform.rotation.y = float(packet.q_y)
-                t.transform.rotation.z = -float(packet.q_z)
+                # ROS 使用 ENU (East-North-Up) 坐标系，右手定则
+                # 四元数取反 Yaw 相当于 z 取反 (w, x, y, -z)
+                imu_msg.orientation.w = float(packet.q_w)
+                imu_msg.orientation.x = float(packet.q_x)
+                imu_msg.orientation.y = float(packet.q_y)
+                imu_msg.orientation.z = -float(packet.q_z) # 取反适配 ROS 坐标系
                 
-                self.tf_broadcaster.sendTransform(t)
+                self.get_logger().debug(f"解析上行: gyro_x={packet.gyro_x:.2f}, "
+                                       f"gyro_y={packet.gyro_y:.2f}, "
+                                       f"gyro_z={packet.gyro_z:.2f}, "
+                                       f"q_w={packet.q_w:.2f}, "
+                                       f"q_x={packet.q_x:.2f}, "
+                                       f"q_y={packet.q_y:.2f}, "
+                                       f"q_z={packet.q_z:.2f}, "
+                                       f"时间ms={packet.timestamp:.2f}")
+                
+                self.pub_imu.publish(imu_msg)
 
                 self.get_logger().debug(
                     f"解析上行: Count={packet.chat_gpt_count}, TS={packet.timestamp}"

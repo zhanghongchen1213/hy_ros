@@ -93,29 +93,29 @@ class KeyboardControlNode(Node):
         self.last_key_time = time.time()
         
         if key == 'w':
-            self.linear_vel = 80.0
+            self.linear_vel = 0.15
             self.angular_vel = 0.0
         elif key == 's':
-            self.linear_vel = -80.0
+            self.linear_vel = -0.15
             self.angular_vel = 0.0
         elif key == 'a':
             self.linear_vel = 0.0
-            self.angular_vel = 5.0
+            self.angular_vel = 2.0
         elif key == 'd':
             self.linear_vel = 0.0
-            self.angular_vel = -5.0
+            self.angular_vel = -2.0
         elif key == 'q': # W + A (前左)
-            self.linear_vel = 80.0
-            self.angular_vel = 5.0
+            self.linear_vel = 0.15
+            self.angular_vel = 2.0
         elif key == 'e': # W + D (前右)
-            self.linear_vel = 80.0
-            self.angular_vel = -5.0
+            self.linear_vel = 0.15
+            self.angular_vel = -2.0
         elif key == 'z': # S + A (后左)
-            self.linear_vel = -80.0
-            self.angular_vel = 5.0
+            self.linear_vel = -0.15
+            self.angular_vel = 2.0
         elif key == 'c': # S + D (后右)
-            self.linear_vel = -80.0
-            self.angular_vel = -5.0
+            self.linear_vel = -0.15
+            self.angular_vel = -2.0
         elif key == '\x03': # Ctrl+C
             self.running = False
         else:

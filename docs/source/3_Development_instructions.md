@@ -1255,7 +1255,8 @@ RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，�
 ```bash
 sudo apt update
 sudo apt install -y ros-humble-slam-toolbox ros-humble-navigation2 \
-    ros-humble-nav2-bringup ros-humble-laser-filters
+    ros-humble-nav2-bringup ros-humble-laser-filters \
+    ros-humble-robot-localization
 ```
 
 ## 2. 配置功能包

@@ -21,7 +21,7 @@ slam_toolbox:
     odom_frame: odom # 里程计坐标系
     map_frame: map # 地图坐标系
     base_frame: base_link # 机器人基座坐标系
-    scan_topic: /scan_filtered # 订阅的雷达话题 (建议使用经过滤波的话题)
+    scan_topic: /scan_filtered # 订阅的雷达话题 (使用经过滤波的话题)
     mode: localization # 核心模式设置: 'localization' (纯定位) 或 'mapping' (建图)
 
     # ========================================================
@@ -50,8 +50,10 @@ slam_toolbox:
     # ========================================================
     use_scan_matching: true # 是否启用扫描匹配 (必须为 true)
     use_scan_barycenter: true # 使用扫描重心进行距离计算
-    minimum_travel_distance: 0.5 # 最小运动距离才触发更新 (米)
-    minimum_travel_heading: 0.5 # 最小旋转角度才触发更新 (弧度)
+    # 针对低速机器人优化 (Max v=0.11m/s, w=1.76rad/s)
+    # 降低最小更新距离/角度，避免低速时定位更新停滞
+    minimum_travel_distance: 0.1 # 0.1m (约1秒移动的距离)
+    minimum_travel_heading: 0.2 # 0.2rad (约11.5度)
     scan_buffer_size: 10 # 扫描缓冲区大小
     scan_buffer_maximum_scan_distance: 10.0 # 缓冲区最大扫描距离
     link_match_minimum_response_fine: 0.1

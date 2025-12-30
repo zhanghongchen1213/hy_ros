@@ -33,6 +33,9 @@ def generate_launch_description():
         executable='async_slam_toolbox_node',
         name='slam_toolbox',
         parameters=[slam_params_file, {'use_sim_time': False}],
+        remappings=[
+            ('/scan', '/scan_filtered')
+        ],
         output='screen'
     )
 

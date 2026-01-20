@@ -192,7 +192,7 @@
   </link>
   <joint
     name="radar_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0.029032 0 0.0532"
       rpy="0 0 0" />
@@ -201,12 +201,7 @@
     <child
       link="radar_Link" />
     <axis
-      xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
+      xyz="0 0 0" />
   </joint>
   <link
     name="spine_Link">
@@ -308,7 +303,7 @@
   </link>
   <joint
     name="camera_joint"
-    type="revolute">
+    type="fixed">
     <origin
       xyz="0.069858 0.024995 0.11868"
       rpy="0 0 0" />
@@ -317,12 +312,7 @@
     <child
       link="camera_Link" />
     <axis
-      xyz="0 0 1" />
-    <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
+      xyz="0 0 0" />
   </joint>
   <link
     name="left_arm_Link">

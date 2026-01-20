@@ -396,15 +396,13 @@ class UartNode(Node):
                 # 2. 发布 JointState (关节状态)，用于更新机器人模型
                 joint_msg = JointState()
                 joint_msg.header.stamp = current_time
-                joint_msg.name = ['right_arm_joint', 'left_arm_joint', 'spine_joint', 'radar_joint', 'camera_joint'] 
+                joint_msg.name = ['right_arm_joint', 'left_arm_joint', 'spine_joint'] 
                 # int16=30 -> 30度 -> 30 * (PI/180) rad
                 scale = math.pi / 180.0
                 joint_msg.position = [
                     float(packet.servo_a_angle) * scale,
                     float(packet.servo_b_angle) * scale,
-                    float(packet.servo_c_angle) * scale,
-                    0.0,
-                    0.0
+                    float(packet.servo_c_angle) * scale
                 ]
                 self.pub_joint_state.publish(joint_msg)
 

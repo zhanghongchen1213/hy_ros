@@ -36,3 +36,8 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+
+
+
+echo 'export ANTHROPIC_BASE_URL="https://code.newcli.com/claude/droid"' >> ~/.bashrc
+echo 'export ANTHROPIC_AUTH_TOKEN="sk-ant-oat01-KVZyHy9KuOP25SQFrSonMDYwBDepaGEzYvR1Hp16BKZD2B1vnzQyMmoBprx7eqjj_PLqSuic4PWpP4p_nVNvCJm6npfiOAA"' >> ~/.bashrc

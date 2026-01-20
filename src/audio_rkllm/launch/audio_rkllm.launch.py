@@ -49,7 +49,7 @@ def generate_launch_description():
                     'enable_multimodal': False, # 是否开启多模态 (True: 开启并尝试加载视觉模型, False: 仅纯文本)
                     
                     # 输出语言控制
-                    'force_english': True, # True: 强制 LLM 输出英文; False: 保持默认 (中文)
+                    'force_english': False, # True: 强制 LLM 输出英文; False: 保持默认 (中文)
                 }
             ],
         )

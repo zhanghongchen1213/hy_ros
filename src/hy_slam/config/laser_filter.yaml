@@ -5,6 +5,7 @@
 laser_filter:
   ros__parameters:
     filter1:
+    
       name: rear_box_filter
       type: laser_filters/LaserScanBoxFilter
       params:

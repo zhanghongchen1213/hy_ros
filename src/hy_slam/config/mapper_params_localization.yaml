@@ -36,10 +36,10 @@ slam_toolbox:
     # ========================================================
     debug_logging: false # 是否开启调试日志
     throttle_scans: 1 # 处理帧率控制 (1 = 处理每一帧，2 = 每隔一帧处理一次)
-    transform_publish_period: 0.02 # 地图到里程计 TF 发布周期 (秒)，0.02s = 50Hz
+    transform_publish_period: 0.05 # 地图到里程计 TF 发布周期 (秒)，0.05s = 20Hz，针对嵌入式平台优化
     map_update_interval: 5.0 # 地图更新间隔 (秒)，定位模式下影响可视化更新
     resolution: 0.05 # 地图分辨率 (米/像素)
-    max_laser_range: 20.0 # 雷达最大有效距离 (根据实际雷达型号修改，如 12.0 或 25.0)
+    max_laser_range: 12.0 # 雷达最大有效距离 (与建图配置保持一致，乐动ld06为12m)
     minimum_time_interval: 0.5 # 最小处理时间间隔
     transform_timeout: 0.2 # TF 变换超时时间
     tf_buffer_duration: 30. # TF 缓存时长

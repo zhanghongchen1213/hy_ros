@@ -40,11 +40,14 @@ def generate_launch_description():
         executable='localization_slam_toolbox_node',
         name='slam_toolbox',
         parameters=[
-            localization_params_file, 
+            localization_params_file,
             {
                 'use_sim_time': False,
                 'map_file_name': LaunchConfiguration('map_file_name')
             }
+        ],
+        remappings=[
+            ('/scan', '/scan_filtered')
         ],
         output='screen'
     )

@@ -28,7 +28,7 @@ ekf_filter_node:
     # --------------------------------------
     # 输入源 1: 轮式里程计 (Wheel Odometry)
     # --------------------------------------
-    odom0: /uart/wheel_raw
+    odom0: /uart/wheel_odom
 
     # 配置矩阵: 指定使用哪些字段 (True 表示使用，False 表示忽略)
     # 顺序: x, y, z,

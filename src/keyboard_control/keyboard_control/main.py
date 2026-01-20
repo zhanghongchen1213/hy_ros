@@ -23,6 +23,7 @@ class KeyboardControlNode(Node):
 
         # 2. 发布者
         self.pub_control = self.create_publisher(MotorControl, self.control_topic, 10)
+        self._control_msg = MotorControl()  # 预分配消息对象
         
         # 3. 状态变量
         self.linear_vel = 0.0
@@ -133,11 +134,12 @@ class KeyboardControlNode(Node):
 
     def _publish_control(self):
         # 仅当数值发生变化时才发布
-        if (self.first_run or 
-            abs(self.linear_vel - self.last_linear_vel) > 1e-5 or 
+        if (self.first_run or
+            abs(self.linear_vel - self.last_linear_vel) > 1e-5 or
             abs(self.angular_vel - self.last_angular_vel) > 1e-5):
-            
-            msg = MotorControl()
+
+            # 使用预分配的消息对象
+            msg = self._control_msg
             msg.linear_vel = float(self.linear_vel)
             msg.angular_vel = float(self.angular_vel)
             # 其他字段默认为0

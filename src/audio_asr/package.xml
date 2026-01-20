@@ -9,11 +9,11 @@
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
-  <depend>launch</depend>
-  <depend>launch_ros</depend>
-  
+
   <!-- START添加依赖 -->
   <exec_depend>sherpa-onnx</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
   <!-- END添加依赖 -->
 
   <test_depend>ament_copyright</test_depend>

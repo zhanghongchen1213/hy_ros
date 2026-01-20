@@ -8,14 +8,14 @@
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
-  <depend>launch</depend>
-  <depend>launch_ros</depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <!-- START添加依赖库 -->
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>geometry_msgs</depend>
+  <!-- geometry_msgs 已移除：代码中未实际使用 Quaternion/Twist -->
   <depend>python3-serial</depend>
   <depend>pid_debug_interfaces</depend>
   <!-- END添加依赖库 -->

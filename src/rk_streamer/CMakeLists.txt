@@ -17,9 +17,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
-find_package(OpenCV REQUIRED)
 
 # 5. 寻找 GStreamer
 find_package(PkgConfig REQUIRED)
@@ -36,12 +34,10 @@ add_library(rk_streamer_component SHARED
 target_include_directories(rk_streamer_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
-  ${OpenCV_INCLUDE_DIRS}
   ${GST_INCLUDE_DIRS}
 )
 
 target_link_libraries(rk_streamer_component
-  ${OpenCV_LIBRARIES}
   ${GST_LIBRARIES}
 )
 
@@ -49,7 +45,6 @@ ament_target_dependencies(rk_streamer_component
   rclcpp
   rclcpp_components
   sensor_msgs
-  cv_bridge
   image_transport
 )
 

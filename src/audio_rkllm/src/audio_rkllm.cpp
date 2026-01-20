@@ -143,7 +143,7 @@ bool RKLLMNode::init_rkllm()
 
 void RKLLMNode::asr_callback(const std_msgs::msg::String::SharedPtr msg)
 {
-    std::string content = msg->data;
+    const std::string& content = msg->data;  // 使用引用避免拷贝
 
     if (content == "START") {
         // 状态机复位，开始新的一轮收集

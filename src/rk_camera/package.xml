@@ -12,8 +12,6 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>  <!-- 新增 rclcpp_components 依赖 -->
   <depend>sensor_msgs</depend> <!-- 新增 sensor_msgs 依赖 -->
-  <depend>cv_bridge</depend><!-- 新增 cv_bridge 依赖 -->
-  <depend>image_transport</depend><!-- 新增 image_transport 依赖 -->
   <depend>launch</depend>
   <depend>launch_ros</depend>
   

@@ -7,7 +7,6 @@ endif()
 
 # 1.新增功能包
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
 find_package(urdf REQUIRED)
 
 # 2.新增安装目录

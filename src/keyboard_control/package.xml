@@ -8,9 +8,9 @@
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
-  <depend>std_msgs</depend>
-  <depend>launch</depend>
-  <depend>launch_ros</depend>
+  <!-- std_msgs 已移除：代码中未实际使用 -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
   <depend>pid_debug_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>

@@ -10,6 +10,10 @@ endif()
 # 3.新增：开启编译器警告（可选）
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
+  # 3.1 性能优化：Release 模式下启用 O3 优化
+  if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_options(-O3 -march=native -DNDEBUG)
+  endif()
 endif()
 
 # 4.新增：寻找依赖包（必选）
@@ -41,6 +45,13 @@ ament_target_dependencies(audio_rkllm_node
   rclcpp
   std_msgs
 )
+
+# 8.1 性能优化：链接时优化 (LTO) 和移除未使用符号
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set_target_properties(audio_rkllm_node PROPERTIES
+    LINK_FLAGS "-Wl,--as-needed"  # 移除未使用的库链接
+  )
+endif()
 
 # 9.新增：安装可执行文件（必选）
 install(TARGETS audio_rkllm_node

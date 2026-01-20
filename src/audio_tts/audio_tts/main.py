@@ -73,7 +73,7 @@ class AudioTTSNode(Node):
         p = self.get_parameter(name)
         v = p.value
         if isinstance(v, str) and len(v) > 0:
-            self.get_logger().info(f"参数 '{name}' 值为 {v}")
+            self.get_logger().debug(f"参数 '{name}' 值为 {v}")
             return v
         if v is None or (isinstance(v, str) and len(v) == 0):
             self.get_logger().fatal(f"缺少必需参数 '{name}'（字符串）")
@@ -88,7 +88,7 @@ class AudioTTSNode(Node):
         p = self.get_parameter(name)
         v = p.value
         if isinstance(v, int):
-            self.get_logger().info(f"参数 '{name}' 值为 {v}")
+            self.get_logger().debug(f"参数 '{name}' 值为 {v}")
             return v
         if v is None:
             self.get_logger().fatal(f"缺少必需参数 '{name}'（整数）")
@@ -103,7 +103,7 @@ class AudioTTSNode(Node):
         p = self.get_parameter(name)
         v = p.value
         if isinstance(v, float):
-            self.get_logger().info(f"参数 '{name}' 值为 {v}")
+            self.get_logger().debug(f"参数 '{name}' 值为 {v}")
             return v
         if v is None:
             self.get_logger().fatal(f"缺少必需参数 '{name}'（浮点数）")

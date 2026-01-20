@@ -2,17 +2,17 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState, Joy, Imu
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Quaternion
-from std_msgs.msg import UInt16, UInt8, Float32
-from geometry_msgs.msg import Twist
+from std_msgs.msg import UInt16, UInt8
 from pid_debug_interfaces.msg import MotorControl, MotorStatus
 import serial
 import threading
-import struct
 import time
 import ctypes
 import queue
 import math
+
+# 预计算常量
+DEG_TO_RAD = math.pi / 180.0
 
 # ==========================================
 # 数据包结构定义 (与 C 代码保持一致)
@@ -139,16 +139,30 @@ class UartNode(Node):
         self.joy_servo_b = 0.0
         self.joy_servo_c = 0.0
         self.last_buttons = []
+        self._buttons_len = 0  # 缓存按钮数组长度
         
         # 3. ROS 接口
         # [Pub] 上行
         self.pub_chat = self.create_publisher(UInt16, self.chat_topic, 10)
         self.pub_motor_status = self.create_publisher(MotorStatus, self.motor_status_topic, 10)
         self.pub_joint_state = self.create_publisher(JointState, 'joint_states', 10)
-        
+
         self.pub_odom = self.create_publisher(Odometry, self.wheel_odom_topic, 10)
         self.pub_imu = self.create_publisher(Imu, self.imu_data_topic, 10)
-        
+
+        # 预分配消息对象 (避免回调中频繁创建)
+        self._downlink_packet = UartDownlinkPacket()
+        self._joint_msg = JointState()
+        self._joint_msg.name = ['right_arm_joint', 'left_arm_joint', 'spine_joint']
+        self._joint_msg.position = [0.0, 0.0, 0.0]
+        self._odom_msg = Odometry()
+        self._odom_msg.header.frame_id = "odom"
+        self._odom_msg.child_frame_id = "base_link"
+        self._imu_msg = Imu()
+        self._imu_msg.header.frame_id = "base_link"
+        self._motor_status_msg = MotorStatus()
+        self._chat_msg = UInt16()  # 预分配 chat 消息
+
         # [Sub] 下行
         self.sub_audio_status = self.create_subscription(
             UInt8, self.audio_status_topic, self._on_audio_status, 10)
@@ -171,14 +185,13 @@ class UartNode(Node):
         ROS 回调：收到音频状态更新，立即组装下行包发送。
         """
         flag = msg.data
-        # self.get_logger().info(f"收到状态更新: {flag}，准备下发...")
-        
+        # 复用预分配的下行包对象
         packet = UartDownlinkPacket()
         packet.start_flag = UartDownlinkPacket.START_FLAG
         packet.audio_stream_flag = flag
         packet.timestamp = int(time.time() * 1000) & 0xFFFFFFFF
         packet.end_flag = UartDownlinkPacket.END_FLAG
-        
+
         self.send_queue.put(packet)
 
     def _on_joy(self, msg: Joy):
@@ -186,40 +199,38 @@ class UartNode(Node):
         ROS 回调：收到手柄数据，解析并控制
         """
         # 1. 解析 Axes (前4个)
-        # 用户需求：前两个配置给 linear (L84), 后两个配置给 angular (L85)
-        # 采用标准映射：axes[1] -> linear, axes[3] -> angular
         linear = 0.0
         angular = 0.0
         if len(msg.axes) >= 4:
             linear = msg.axes[1] * 0.11  # Max 0.11 m/s
             angular = msg.axes[3] * 1.76 # Max 1.76 rad/s
-        
-        # 2. 解析 Buttons (前6个)
-        if len(self.last_buttons) != len(msg.buttons):
-            self.last_buttons = [0] * len(msg.buttons)
-            
-        def check_press(idx):
-            if idx < len(msg.buttons):
-                return msg.buttons[idx] == 1 and self.last_buttons[idx] == 0
-            return False
 
-        # Button 0 (1st): Servo A + 5
-        if check_press(0): self.joy_servo_a += 5.0
-        # Button 1 (2nd): Servo A - 5
-        if check_press(1): self.joy_servo_a -= 5.0
-        
-        # Button 2 (3rd): Servo B + 5
-        if check_press(2): self.joy_servo_b += 5.0
-        # Button 3 (4th): Servo B - 5
-        if check_press(3): self.joy_servo_b -= 5.0
-        
-        # Button 4 (5th): Servo C + 5
-        if check_press(4): self.joy_servo_c += 5.0
-        # Button 5 (6th): Servo C - 5
-        if check_press(5): self.joy_servo_c -= 5.0
-        
-        self.last_buttons = list(msg.buttons)
-        
+        # 2. 解析 Buttons (前6个) - 优化：避免每次创建新列表
+        buttons = msg.buttons
+        btn_len = len(buttons)
+        if self._buttons_len != btn_len:
+            self.last_buttons = [0] * btn_len
+            self._buttons_len = btn_len
+
+        # 内联检查按钮按下（避免函数调用开销）
+        last = self.last_buttons
+        if btn_len > 0 and buttons[0] == 1 and last[0] == 0:
+            self.joy_servo_a += 5.0
+        if btn_len > 1 and buttons[1] == 1 and last[1] == 0:
+            self.joy_servo_a -= 5.0
+        if btn_len > 2 and buttons[2] == 1 and last[2] == 0:
+            self.joy_servo_b += 5.0
+        if btn_len > 3 and buttons[3] == 1 and last[3] == 0:
+            self.joy_servo_b -= 5.0
+        if btn_len > 4 and buttons[4] == 1 and last[4] == 0:
+            self.joy_servo_c += 5.0
+        if btn_len > 5 and buttons[5] == 1 and last[5] == 0:
+            self.joy_servo_c -= 5.0
+
+        # 原地更新而非创建新列表
+        for i in range(btn_len):
+            last[i] = buttons[i]
+
         # 3. 发送下行包
         packet = UartDownlinkPacket()
         packet.start_flag = UartDownlinkPacket.START_FLAG
@@ -369,18 +380,18 @@ class UartNode(Node):
                 
             # 3. 解析数据
             try:
-                # 拷贝数据到结构体
-                packet_bytes = bytes(b[:packet_size])
-                packet = UartUplinkPacket.from_buffer_copy(packet_bytes)
-                
+                # 直接从 buffer 解析，避免额外拷贝
+                packet = UartUplinkPacket.from_buffer_copy(b[:packet_size])
+
                 # 获取当前时间戳，用于同步
                 current_time = self.get_clock().now().to_msg()
-                
-                # 发布话题
-                self.pub_chat.publish(UInt16(data=packet.chat_gpt_count))
-                
-                # 1. 发布 MotorStatus (电机状态，用于PID调试)
-                status_msg = MotorStatus()
+
+                # 发布话题 - 使用预分配对象
+                self._chat_msg.data = packet.chat_gpt_count
+                self.pub_chat.publish(self._chat_msg)
+
+                # 1. 发布 MotorStatus (电机状态，用于PID调试) - 使用预分配对象
+                status_msg = self._motor_status_msg
                 status_msg.left_target_speed = packet.left_target_speed
                 status_msg.right_target_speed = packet.right_target_speed
                 status_msg.left_actual_speed = packet.left_actual_speed
@@ -392,61 +403,51 @@ class UartNode(Node):
                 status_msg.right_ki = packet.right_ki
                 status_msg.right_kd = packet.right_kd
                 self.pub_motor_status.publish(status_msg)
-                
-                # 2. 发布 JointState (关节状态)，用于更新机器人模型
-                joint_msg = JointState()
+
+                # 2. 发布 JointState (关节状态) - 使用预分配对象
+                joint_msg = self._joint_msg
                 joint_msg.header.stamp = current_time
-                joint_msg.name = ['right_arm_joint', 'left_arm_joint', 'spine_joint'] 
-                # int16=30 -> 30度 -> 30 * (PI/180) rad
-                scale = math.pi / 180.0
-                joint_msg.position = [
-                    float(packet.servo_a_angle) * scale,
-                    float(packet.servo_b_angle) * scale,
-                    float(packet.servo_c_angle) * scale
-                ]
+                # 使用预计算常量 DEG_TO_RAD
+                joint_msg.position[0] = float(packet.servo_a_angle) * DEG_TO_RAD
+                joint_msg.position[1] = float(packet.servo_b_angle) * DEG_TO_RAD
+                joint_msg.position[2] = float(packet.servo_c_angle) * DEG_TO_RAD
                 self.pub_joint_state.publish(joint_msg)
 
-                # 3. 发布 Odometry (/uart/wheel_raw)
-                odom_msg = Odometry()
+                # 3. 发布 Odometry - 使用预分配对象
+                odom_msg = self._odom_msg
                 odom_msg.header.stamp = current_time
-                odom_msg.header.frame_id = "odom"
-                odom_msg.child_frame_id = "base_link"
-                
-                # 位置 (m) 
+
+                # 位置 (m)
                 odom_msg.pose.pose.position.x = float(packet.position_x)
                 odom_msg.pose.pose.position.y = float(packet.position_y)
                 odom_msg.pose.pose.position.z = 0.0
-                
+
                 # 姿态 (Theta -> Quaternion)
-                # theta_wheel is rad
                 half_theta = float(packet.theta_wheel) * 0.5
                 odom_msg.pose.pose.orientation.z = math.sin(half_theta)
                 odom_msg.pose.pose.orientation.w = math.cos(half_theta)
-                
+
                 # 速度
                 odom_msg.twist.twist.linear.x = float(packet.linear_vel_x)
                 odom_msg.twist.twist.angular.z = float(packet.angular_vel_wheel)
-                
+
                 self.pub_odom.publish(odom_msg)
 
-                # 4. 发布 IMU (/uart/imu_data)
-                imu_msg = Imu()
+                # 4. 发布 IMU - 使用预分配对象
+                imu_msg = self._imu_msg
                 imu_msg.header.stamp = current_time
-                imu_msg.header.frame_id = "base_link"
-                
+
                 # 角速度 (rad/s)
                 imu_msg.angular_velocity.x = float(packet.gyro_x)
                 imu_msg.angular_velocity.y = float(packet.gyro_y)
-                imu_msg.angular_velocity.z = -float(packet.gyro_z) # 取反适配 ROS 坐标系
-                
-                # 姿态 (四元数)
-                # ROS 使用 ENU (East-North-Up) 坐标系，右手定则
-                # 四元数取反 Yaw 相当于 z 取反 (w, x, y, -z)
+                imu_msg.angular_velocity.z = -float(packet.gyro_z)  # 取反适配 ROS 坐标系
+
+                # 姿态 (四元数) - 取反 z 适配 ROS ENU 坐标系
                 imu_msg.orientation.w = float(packet.q_w)
                 imu_msg.orientation.x = float(packet.q_x)
                 imu_msg.orientation.y = float(packet.q_y)
-                imu_msg.orientation.z = -float(packet.q_z) # 取反适配 ROS 坐标系
-                
+                imu_msg.orientation.z = -float(packet.q_z)
+
                 self.get_logger().debug(f"解析上行: gyro_x={packet.gyro_x:.2f}, "
                                        f"gyro_y={packet.gyro_y:.2f}, "
                                        f"gyro_z={packet.gyro_z:.2f}, "
@@ -455,7 +456,7 @@ class UartNode(Node):
                                        f"q_y={packet.q_y:.2f}, "
                                        f"q_z={packet.q_z:.2f}, "
                                        f"时间ms={packet.timestamp:.2f}")
-                
+
                 self.pub_imu.publish(imu_msg)
 
                 self.get_logger().debug(

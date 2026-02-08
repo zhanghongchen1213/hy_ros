@@ -18,11 +18,11 @@
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
 | 个人博客                 | [https://zhcmqtt.top](https://zhcmqtt.top)                                                                             |
 | CSDN博客                 | [https://blog.csdn.net](https://blog.csdn.net/weixin_46477159?spm=1000.2115.3001.5343)                                 |
-| 立创硬件开源             | [https://x.jlc.com]( https://oshwhub.com/nhwjxzxz/huang-you-ji-qi-ren)                                                        |
+| 立创硬件开源             | [https://x.jlc.com](https://oshwhub.com/nhwjxzxz/huang-you-ji-qi-ren)                                                  |
 | GitHub——ROS算法开源      | [https://github.com/zhanghongchen1213/hy_ros](https://github.com/zhanghongchen1213/hy_ros)                             |
 | GitHub——驱动器算法开源   | [https://github.com/zhanghongchen1213/hy_driver](https://github.com/zhanghongchen1213/hy_driver)                       |
 | GitHub——yolo训练算法开源 | [https://github.com/zhanghongchen1213/butter_yolov8n_train](https://github.com/zhanghongchen1213/butter_yolov8n_train) |
-| 开发教程开源源           | [https://hy-ros.readthedocs.io](https://hy-ros.readthedocs.io/zh-cn/latest/1_product_introduction.html)                |
+| 开发教程开源             | [https://hy-ros.readthedocs.io](https://hy-ros.readthedocs.io/zh-cn/latest/1_product_introduction.html)                |
 
 # 📷 产品外观
 

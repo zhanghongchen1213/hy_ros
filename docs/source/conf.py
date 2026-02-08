@@ -7,14 +7,14 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = '黄油机器人'
-copyright = '2025, 晨曦烧录君'
-author = '晨曦烧录君'
+copyright = '2025, 鸿尘客'
+author = '鸿尘客'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = ['myst_parser', 'sphinx_markdown_tables']
-myst_enable_extensions = ['attrs_inline']
+myst_enable_extensions = ['attrs_inline', 'colon_fence']
 
 templates_path = ['_templates']
 exclude_patterns = []

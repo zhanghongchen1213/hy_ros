@@ -1,78 +1,85 @@
 # 一、主机环境配置
 
-本项目主机环境为 Ubuntu22.04 系统，确保与端侧处于同一局域网络环境
+本项目主机环境为 Ubuntu22.04 系统，确保与端侧处于同一局域网络环境。
 
 1. 启动本项目文件中配置 NFS 服务器脚本，挂载本地 NFS 目录: `sudo nfs_config.sh`
-2. 将本项目文件放到`/home/${SUDO_USER:-$USER}/hy_linux/nfs`目录下
+
+2. 将本项目文件放到 `/home/${SUDO_USER:-$USER}/hy_linux/nfs` 目录下
+
 3. 参考教程：[鱼香 ROS2 一键安装](https://blog.csdn.net/weixin_71683006/article/details/150465016?ops_request_misc=elastic_search_misc&request_id=dd0d7d3fd479c65031b7b2767c112822&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~top_positive~default-1-150465016-null-null.142^v102^pc_search_result_base3&utm_term=%E9%B1%BC%E9%A6%99ros2%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85&spm=1018.2226.3001.4187)
 
-```shell
-# 一键配置ROS2 humble开发环境
-cd /opt
-wget --no-check-certificate https://fishros.com/install -O fishros
-chmod +x fishros
-./fishros
-# 1:一键安装 -> 1:更换系统源再继续安装 -> 2:更新系统源并清理第三方源 -> 1：自动测速选择最快的源 -> \
-# 1:中科大镜像源 -> 1:humble(ROS2) -> 1:humble(ROS2)桌面版 -> 开始自动安装等待20min左右
-```
+   ```shell
+   # 一键配置ROS2 humble开发环境
+   cd /opt
+   wget --no-check-certificate https://fishros.com/install -O fishros
+   chmod +x fishros
+   ./fishros
+   # 1:一键安装 -> 1:更换系统源再继续安装 -> 2:更新系统源并清理第三方源 -> 1：自动测速选择最快的源 -> \
+   # 1:中科大镜像源 -> 1:humble(ROS2) -> 1:humble(ROS2)桌面版 -> 开始自动安装等待20min左右
+   ```
 
-[![ylDjRa.md.png](https://i.imgs.ovh/2026/02/08/ylDjRa.md.png)](https://imgloc.com/image/ylDjRa)
+   [![ylDjRa.md.png](https://i.imgs.ovh/2026/02/08/ylDjRa.md.png)](https://imgloc.com/image/ylDjRa)
 
-- 可在主机环境按照相同方法同步配置完 ros2 后，测试双端通信是否成功
-  - 端侧：`ros2 run demo_nodes_cpp talker`
-  - 主机侧：`ros2 run demo_nodes_cpp listener`
+4. 可在主机环境按照相同方法同步配置完 ros2 后，测试双端通信是否成功
 
-[![ylDFP4.md.png](https://i.imgs.ovh/2026/02/08/ylDFP4.md.png)](https://imgloc.com/image/ylDFP4)
+   - 端侧：`ros2 run demo_nodes_cpp talker`
+   - 主机侧：`ros2 run demo_nodes_cpp listener`
 
----
+   [![ylDFP4.md.png](https://i.imgs.ovh/2026/02/08/ylDFP4.md.png)](https://imgloc.com/image/ylDFP4)
 
 5. 安装必要的 python 库
 
-```shell
-# 用于语音复刻模型
-sudo apt-get install python3-aiohttp python3-websockets
-```
+   ```shell
+   # 用于语音复刻模型
+   sudo apt-get install python3-aiohttp python3-websockets
+   ```
 
 # 二、端侧环境配置
 
 ## 1. 个人初始配置
 
-1.1 烧录镜像文件 **Orangepi5pro_1.0.6_ubuntu_jammy_server_linux5.10.160** 到 tf 卡中
+### 1.1 烧录镜像文件
 
----
+烧录镜像文件 **Orangepi5pro_1.0.6_ubuntu_jammy_server_linux5.10.160** 到 tf 卡中。
 
-1.2 修改 root 用户自动登录终端（密码 **orangepi**）
+### 1.2 修改 root 用户自动登录终端
+
+密码为 **orangepi**
 
 ```shell
 sudo auto_login_cli.sh root
 ```
 
----
+### 1.3 连接 wifi
 
-1.2 连接 wifi
-
-**注意**：输入自己的 wifi 名和密码，并记录 ip 地址
+```{note}
+输入自己的 wifi 名和密码，并记录 ip 地址。
+```
 
 ```shell
 sudo nmcli dev wifi connect wifi名称 password wifi密码
 ip addr show wlan0
 ```
 
----
+### 1.4 SSH 远程连接测试
 
-1.3 SSH 远程连接测试（密码 orangepi）
+密码为 orangepi
 
-**注意**：替换为端侧 ip 地址。例如 192.168.22.188
+```{note}
+替换为端侧 ip 地址。例如 192.168.22.188
+```
 
 ```shell
 ssh root@端侧IP地址
 ```
 
----
-
 ## 2. 挂载配置
 
 ### 2.1 挂载 NFS
+
+```{important}
+挂载命令中需修改为实际的 ubuntu 主机侧 IP 地址（如 192.168.22.177）、NFS 开发路径（如 /home/k/hy_linux/nfs）和端侧挂载路径（如 /mnt/nfs）。
+```
 
 ```shell
 # 1. 安装和挂载NFS
@@ -80,7 +87,6 @@ sudo apt update
 sudo apt install -y nfs-common
 mkdir /mnt/nfs
 # 手动挂载，重启后不会自动挂载
-# 注意事项：这里修改为ubuntu主机侧IP地址(192.168.22.177):/nfs开发路径(/home/k/hy_linux/nfs) 端侧挂载路径(/mnt/nfs)
 sudo mount -t nfs -o nolock 主机IP地址:/主机挂载路径 端侧挂载路径
 sudo mount -t nfs -o nolock 192.168.22.177:/home/k/hy_linux/nfs /mnt/nfs
 
@@ -92,8 +98,6 @@ echo -e 'if [ -f ~/.bashrc ]; then\n    . ~/.bashrc\nfi' >> ~/.bash_profile
 echo 'sudo mount -t nfs -o nolock 192.168.22.177:/home/k/hy_linux/nfs /mnt/nfs' >> ~/.bashrc
 source ~/.bash_profile
 ```
-
----
 
 ### 2.2 挂载 emmc(可选)
 
@@ -175,7 +179,9 @@ v4l2-ctl --list-formats-ext
 /usr/local/bin/mjpg_streamer -i "/usr/local/lib/mjpg-streamer/input_uvc.so -d /dev/video0 -n -f 10 -r 1920x1080" -o "/usr/local/lib/mjpg-streamer/output_http.so -p 8085 -w /usr/local/share/mjpg-streamer/www"
 ```
 
-- 打开浏览器，输入**端侧 IP 地址加端口号**（如：http://192.168.22.188:8085）即可查看实时视频流
+```{tip}
+打开浏览器，输入**端侧 IP 地址加端口号**（如：http://192.168.22.188:8085）即可查看实时视频流。
+```
 
 [![ylDTcN.md.png](https://i.imgs.ovh/2026/02/08/ylDTcN.md.png)](https://imgloc.com/image/ylDTcN)
 
@@ -203,8 +209,6 @@ python3 ldlidar_driver_python3.py
 ```
 
 [![ylDU8H.md.png](https://i.imgs.ovh/2026/02/08/ylDU8H.md.png)](https://imgloc.com/image/ylDU8H)
-
----
 
 [![ylDARQ.md.png](https://i.imgs.ovh/2026/02/08/ylDARQ.md.png)](https://imgloc.com/image/ylDARQ)
 
@@ -238,8 +242,9 @@ sudo orangepi-config
 
 ## 1. 部署 Sherpa-ONNX-RKNPU 流式 ASR 模型
 
-- **参考：**[Sherpa-ONNX for RKNPU](https://k2-fsa.github.io/sherpa/onnx/rknn/install.html#)
-- 安装 Sherpa-ONNX-RKNPU
+**参考：**[Sherpa-ONNX for RKNPU](https://k2-fsa.github.io/sherpa/onnx/rknn/install.html#)
+
+### 安装 Sherpa-ONNX-RKNPU
 
 ```shell
 # 1. ROS2功能包API调用库
@@ -272,7 +277,6 @@ cp /opt/sherpa-onnx/librknnrt.so /usr/lib/
 echo "$(python3 -c "import sherpa_onnx, os; print(os.path.join(os.path.dirname(sherpa_onnx.__file__), 'lib'))")" | sudo tee /etc/ld.so.conf.d/sherpa_onnx.conf
 sudo ldconfig
 
-
 # 5. 检查是否开启rknn支持，具体检查是否具有librknnrt.so库，若没有则参考连接手动安装
 ldd $(which sherpa-onnx)
 # 查看当前rknnrt版本，实测2.3.0版本可用无报错
@@ -281,10 +285,9 @@ strings /lib/librknnrt.so | grep "librknnrt version"
 
 [![ylDRYF.md.png](https://i.imgs.ovh/2026/02/08/ylDRYF.md.png)](https://imgloc.com/image/ylDRYF)
 
----
+### 下载预训练模型并终端测试
 
-- **参考：**[pre-trained models for RKNPU](https://k2-fsa.github.io/sherpa/onnx/rknn/models.html#)
-- 下载预训练模型并终端测试 rknpu-sherpa-onnx 模型
+**参考：**[pre-trained models for RKNPU](https://k2-fsa.github.io/sherpa/onnx/rknn/models.html#)
 
 ```shell
 # 1> 方式1：在线下载文件
@@ -309,7 +312,6 @@ sherpa-onnx \
   --tokens=./sherpa-onnx-rk3588-streaming-zipformer-small-bilingual-zh-en-2023-02-16/tokens.txt \
   ./sherpa-onnx-rk3588-streaming-zipformer-small-bilingual-zh-en-2023-02-16/test_wavs/4.wav
 
-
 # 5. 实时音频测试
 sherpa-onnx-alsa \
   --provider=rknn \
@@ -322,16 +324,14 @@ sherpa-onnx-alsa \
 
 [![ylDg1m.md.png](https://i.imgs.ovh/2026/02/08/ylDg1m.md.png)](https://imgloc.com/image/ylDg1m)
 
----
-
 [![ylDqT9.md.png](https://i.imgs.ovh/2026/02/08/ylDqT9.md.png)](https://imgloc.com/image/ylDqT9)
-
----
 
 ## 2. 部署 RKLLM Qwen3-VL-2B 模型
 
-- **参考：**[RKLLM 模型转换](https://doc.embedfire.com/linux/rk356x/Ai/zh/latest/lubancat_ai/example/qwen2_vl.html)
-- **参考：**[Qwen-VL-2B 部署 RK3588S](https://blog.csdn.net/lajuchenghui/article/details/150111489)
+**参考：**
+
+- [RKLLM 模型转换](https://doc.embedfire.com/linux/rk356x/Ai/zh/latest/lubancat_ai/example/qwen2_vl.html)
+- [Qwen-VL-2B 部署 RK3588S](https://blog.csdn.net/lajuchenghui/article/details/150111489)
 
 ```shell
 # 1. 安装OpenCV库，Qwen3-VL-2B ROS功能包多模态输入需求库
@@ -378,57 +378,58 @@ export LD_LIBRARY_PATH=./lib
 
 [![ylD5Qc.md.png](https://i.imgs.ovh/2026/02/08/ylD5Qc.md.png)](https://imgloc.com/image/ylD5Qc)
 
----
-
 [![ylDef6.md.png](https://i.imgs.ovh/2026/02/08/ylDef6.md.png)](https://imgloc.com/image/ylDef6)
 
 ## 3. 部署百度大模型音色复刻 TTS
 
-- **参考：**[百度大模型音色复刻 TTS](https://cloud.baidu.com/doc/SPEECH/s/Am8wytft2)
+**参考：**[百度大模型音色复刻 TTS](https://cloud.baidu.com/doc/SPEECH/s/Am8wytft2)
 
 1. 安装必要的 python 库
 
-> **注意：** 主机侧和端侧均需要安装,音色管理创建等操作可以在主机侧进行
->
-> ```shell
-> # 安装异步 http 库和 websockets 库
-> sudo apt-get install python3-aiohttp python3-websockets
-> ```
+   ```{note}
+   主机侧和端侧均需要安装，音色管理创建等操作可以在主机侧进行。
+   ```
 
-2. 复刻本人音色，需录制 15s 任意文本音频, 并转换为 base64 编码的 mp3 格式
+   ```shell
+   # 安装异步 http 库和 websockets 库
+   sudo apt-get install python3-aiohttp python3-websockets
+   ```
 
-> - [在线转换工具](https://www.toolfk.com/en/tools/audio-to-base64.html)
-> - 下载 base64.txt 文件,替换`hy_ros/src/audio_tts/audio_tts/base64.txt`
+2. 复刻本人音色，需录制 15s 任意文本音频，并转换为 base64 编码的 mp3 格式
 
-3. 复刻机器人音色，可直接使用`hy_ros/src/audio_tts/audio_tts/base64_robot.txt`
+   - [在线转换工具](https://www.toolfk.com/en/tools/audio-to-base64.html)
+   - 下载 base64.txt 文件，替换 `hy_ros/src/audio_tts/audio_tts/base64.txt`
 
-   > - 机器人音色可以直接修改文件`hy_ros/src/audio_tts/audio_tts/tts_api.py` 中的`base64_file_path` 变量为`base64_robot.txt`
+3. 复刻机器人音色，可直接使用 `hy_ros/src/audio_tts/audio_tts/base64_robot.txt`
+
+   ```{tip}
+   机器人音色可以直接修改文件 `hy_ros/src/audio_tts/audio_tts/tts_api.py` 中的 `base64_file_path` 变量为 `base64_robot.txt`。
+   ```
 
 4. 获取 API key
 
-> - 参考[百度大模型应用创建](https://ai.baidu.com/ai-doc/REFERENCE/Bkru0l60m)创建应用配置百度智能云 api 密钥，Server Key
-> - 更新到秘钥到`hy_ros/src/audio_tts/launch/audio_tts_launch.py` 文件中和`tts_api.py` 文件中
-> - 设置`tts_api.py` 文件中的`run_create_voice` 变量为 True, 表示在运行时创建 Voice ID
+   - 参考[百度大模型应用创建](https://ai.baidu.com/ai-doc/REFERENCE/Bkru0l60m)创建应用配置百度智能云 api 密钥，Server Key
+   - 更新到秘钥到 `hy_ros/src/audio_tts/launch/audio_tts_launch.py` 文件中和 `tts_api.py` 文件中
+   - 设置 `tts_api.py` 文件中的 `run_create_voice` 变量为 True，表示在运行时创建 Voice ID
 
-4. 创建 Voice ID
+5. 创建 Voice ID
 
-> **注意：** 可直接在主机侧运行创建并更新 Voice ID
->
-> - 在 `hy_ros/src/audio_tts/audio_tts` 目录下运行`python3 tts_api.py`
-> - 查看并记录返回的 Voice ID
-> - 更新秘钥、音色 ID 到 `hy_ros/src/audio_tts/launch/audio_tts_launch.py` 文件中
+   ```{note}
+   可直接在主机侧运行创建并更新 Voice ID。
+   ```
 
-4. 音色管理
-   > - 设置`tts_api.py` 文件中的`run_tts` 变量为 True, 表示在运行时使用音色复刻 TTS 进行测试
-   > - 设置`tts_api.py` 文件中的`run_list_voice` 变量为 True, 表示在运行时查看 Voice ID 列表
-   > - 设置`tts_api.py` 文件中的`run_query_detail` 变量为 True, 表示在运行时查看 Voice ID 详情
-   > - 设置`tts_api.py` 文件中的`run_delete_voice` 变量为 True, 表示在运行时删除 Voice ID
+   - 在 `hy_ros/src/audio_tts/audio_tts` 目录下运行 `python3 tts_api.py`
+   - 查看并记录返回的 Voice ID
+   - 更新秘钥、音色 ID 到 `hy_ros/src/audio_tts/launch/audio_tts_launch.py` 文件中
 
----
+6. 音色管理
+
+   - 设置 `tts_api.py` 文件中的 `run_tts` 变量为 True，表示在运行时使用音色复刻 TTS 进行测试
+   - 设置 `tts_api.py` 文件中的 `run_list_voice` 变量为 True，表示在运行时查看 Voice ID 列表
+   - 设置 `tts_api.py` 文件中的 `run_query_detail` 变量为 True，表示在运行时查看 Voice ID 详情
+   - 设置 `tts_api.py` 文件中的 `run_delete_voice` 变量为 True，表示在运行时删除 Voice ID
 
 [![ylD9td.md.png](https://i.imgs.ovh/2026/02/08/ylD9td.md.png)](https://imgloc.com/image/ylD9td)
-
----
 
 [![ylDMyg.md.png](https://i.imgs.ovh/2026/02/08/ylDMyg.md.png)](https://imgloc.com/image/ylDMyg)
 
@@ -443,9 +444,7 @@ Foxglove Bridge 用于将 ROS 2 话题通过 WebSocket 转发给 Foxglove Studio
 sudo apt-get install -y ros-humble-joint-state-publisher
 # 配置 foxglove_bridge,实现话题转发
 sudo apt-get install -y ros-humble-foxglove-bridge
-# 配置 RTSP 转 WebRTC 网关，使用 go2rtc拉取硬件编码 RTSP 流
-
-#
+# 配置 RTSP 转 WebRTC 网关，使用 go2rtc 拉取硬件编码 RTSP 流
 ```
 
 ## 2. 上位机连接 (PC/iPad)
@@ -460,14 +459,17 @@ sudo apt-get install -y ros-humble-foxglove-bridge
 
 # 五、 yolov8 目标检测模型训练
 
-如果希望自己训练 yolov8 黄油或其他目标检测模型，以下教程可提供参考；
+如果希望自己训练 yolov8 黄油或其他目标检测模型，以下教程可提供参考。
 
 ## 1. 数据集准备
 
-1. 运行 `tools/capture_tool.py` 采集数据集, 采集到的图像会保存到 `source/butter_img` 目录下。（建议采集 300 张以上图像）
-2. 使用 [roboflow](https://app.roboflow.com) 平台实现数据集标注和管理，
+1. 运行 `tools/capture_tool.py` 采集数据集，采集到的图像会保存到 `source/butter_img` 目录下。（建议采集 300 张以上图像）
 
-> - 本次训练使用 60%网络数据集 + 40%个人自定义数据集[butter_robot_dataset](https://universe.roboflow.com/butter-robot/butter_robot)，可自行下载删除修改
+2. 使用 [roboflow](https://app.roboflow.com) 平台实现数据集标注和管理。
+
+```{tip}
+本次训练使用 60% 网络数据集 + 40% 个人自定义数据集 [butter_robot_dataset](https://universe.roboflow.com/butter-robot/butter_robot)，可自行下载删除修改。
+```
 
 [![ylDQYY.md.png](https://i.imgs.ovh/2026/02/08/ylDQYY.md.png)](https://imgloc.com/image/ylDQYY)
 
@@ -475,7 +477,7 @@ sudo apt-get install -y ros-humble-foxglove-bridge
 
 [![ylD2T1.md.png](https://i.imgs.ovh/2026/02/08/ylD2T1.md.png)](https://imgloc.com/image/ylD2T1)
 
-3. 数据集预处理包括数据增强、数据划分，下载 yolov8 数据集配置文件
+3. 数据集预处理包括数据增强、数据划分，下载 yolov8 数据集配置文件。
 
 [![ylDJuL.md.png](https://i.imgs.ovh/2026/02/08/ylDJuL.md.png)](https://imgloc.com/image/ylDJuL)
 
@@ -505,53 +507,55 @@ uv add --dev ipykernel  # 安装ipykernel库，用于在Jupyter中选择项目�
 
 3. 创建并注册项目内核
 
-> 在项目虚拟环境下注册一个可在 Jupyter/Trae 中选择的内核：
+在项目虚拟环境下注册一个可在 Jupyter/Trae 中选择的内核：
 
-> ```powershell
-> .venv\Scripts\python -m ipykernel install --user --name butter_train > --display-name "Python (butter_train)"
-> ```
+```powershell
+.venv\Scripts\python -m ipykernel install --user --name butter_train --display-name "Python (butter_train)"
+```
 
-> 完成后，系统目录 `C:\Users\<你的用户名> >\AppData\Roaming\jupyter\kernels\butter_train` 会出现对应的 `kernelspec`。
+完成后，系统目录 `C:\Users\<你的用户名>\AppData\Roaming\jupyter\kernels\butter_train` 会出现对应的 `kernelspec`。
 
 4. 在 VSCode 或者 Pycharm IDE 中选择内核
 
-> - 打开 Notebook，使用右上角的内核选择器切换到：`Python (butter_train)`
-> - 选择后，`import pandas as pd` 即可在该项目环境中正常使用。
+打开 Notebook，使用右上角的内核选择器切换到：`Python (butter_train)`。选择后，`import pandas as pd` 即可在该项目环境中正常使用。
 
 5. UV 常用命令
 
-> ```shell
-> uv tree  # 查看项目依赖树
-> uv sync  # 根据 `pyproject.toml` 同步安装依赖到 `.venv`
-> uv sync --no-dev  # 仅安装非开发依赖
-> uv add 'pandas==2.31.0'  # 安装指定版本的 pandas 到项目环境
-> uv add -r requirements.txt  # 根据 `requirements.txt` 安装非开发依赖
-> uv add --dev ipykernel  # 包仅会被加入到开发环境的分组中
-> ```
+```shell
+uv tree  # 查看项目依赖树
+uv sync  # 根据 `pyproject.toml` 同步安装依赖到 `.venv`
+uv sync --no-dev  # 仅安装非开发依赖
+uv add 'pandas==2.31.0'  # 安装指定版本的 pandas 到项目环境
+uv add -r requirements.txt  # 根据 `requirements.txt` 安装非开发依赖
+uv add --dev ipykernel  # 包仅会被加入到开发环境的分组中
+```
 
 ### 2.2 安装 torch-gpu
 
 1. 确认 CUDA 版本以及安装 CUDA 和 cuDNN 版本
 
-> **参考：**[CUDA 和 cuDNN 安装](https://blog.csdn.net/sinat_26398509/article/details/143566753)
+参考：[CUDA 和 cuDNN 安装](https://blog.csdn.net/sinat_26398509/article/details/143566753)
 
 2. UV 安装 torch-gpu
 
-> **参考：**[torch-gpu 安装](https://blog.csdn.net/Humbunklung/article/details/146046406)
+参考：[torch-gpu 安装](https://blog.csdn.net/Humbunklung/article/details/146046406)
 
-> ```shell
-> # 测试环境
-> 显卡：Nvida GeForce RTX 4070 Super
-> CUDA 版本：13.1
-> CUDA Toolkit 版本 13.0
-> cuDNN 版本：9.11.0
-> pytorch-gpu 版本：2.9.1
-> ```
+```text
+# 测试环境
+显卡：Nvida GeForce RTX 4070 Super
+CUDA 版本：13.1
+CUDA Toolkit 版本 13.0
+cuDNN 版本：9.11.0
+pytorch-gpu 版本：2.9.1
+```
 
 ### 2.3 安装 ultralytics
 
-- 安装 ultralytics 库，测试 yolov8n 预训练参数是否成功加载到 GPU
-  **注意**：必须使用 ultralytics rknn 修改版才能正确导出 RKNN 模型，且依然可以通过 UV 进行管理
+安装 ultralytics 库，测试 yolov8n 预训练参数是否成功加载到 GPU。
+
+```{important}
+必须使用 ultralytics rknn 修改版才能正确导出 RKNN 模型，且依然可以通过 UV 进行管理。
+```
 
 ```shell
 # 安装适配 RKNN 的 ultralytics 库（airockchip 维护版本）
@@ -559,9 +563,9 @@ uv add --dev ipykernel  # 安装ipykernel库，用于在Jupyter中选择项目�
 uv add git+https://github.com/airockchip/ultralytics_yolov8.git
 ```
 
-- pyproject.toml 配置文件可参考如下：
+pyproject.toml 配置文件可参考如下：
 
-```yaml
+```toml
 # UV配置文件仅供参考，实际使用时请根据自己的环境进行修改
 [project]
 name = "butter-train-env"
@@ -625,7 +629,6 @@ print("YOLOv8n已加载到GPU：", next(model.model.parameters()).is_cuda)
 
 ```python
 # 开始训练
-# 开始训练
 # data: 数据集配置文件路径 (使用绝对路径避免错误)
 # epochs: 训练轮数
 # imgsz: 输入图像大小
@@ -667,8 +670,6 @@ uv run tensorboard --logdir ../butter_train_results/yolov8n_butter --port 6006
 
 [![ylDlyh.md.png](https://i.imgs.ovh/2026/02/08/ylDlyh.md.png)](https://imgloc.com/image/ylDlyh)
 
----
-
 ```python
 from ultralytics import YOLO
 # 1. 加载训练好的最佳权重文件
@@ -681,21 +682,17 @@ success = model.export(format="rknn")
 print(f"导出完成: {success}")
 ```
 
----
-
-**注意**：必须使用 ultralytics rknn 修改版才能正确导出 RKNN 模型，，导出的模型必须是唯一的.onnx 文件。
-
----
+```{warning}
+必须使用 ultralytics rknn 修改版才能正确导出 RKNN 模型，导出的模型必须是唯一的 .onnx 文件。
+```
 
 [![ylDtge.md.png](https://i.imgs.ovh/2026/02/08/ylDtge.md.png)](https://imgloc.com/image/ylDtge)
-
----
 
 ## 3. Ubuntu 环境实现模型转换
 
 ### 3.1 docker 安装 RKNN-Toolkit2
 
-因为在宿主机配置 RKNN-Toolkit2 环境，极易出错，所以建议在 Ubuntu 环境下使用 Docker 容器来运行 RKNN-Toolkit2。
+因为在宿主机配置 RKNN-Toolkit2 环境极易出错，所以建议在 Ubuntu 环境下使用 Docker 容器来运行 RKNN-Toolkit2。
 
 1. 下载并安装 Docker
 
@@ -720,7 +717,7 @@ echo \
 # 更新软件包索引
 sudo apt update
 
-#  安装Docker核心组件（engine+cli+containerd）
+# 安装Docker核心组件（engine+cli+containerd）
 sudo apt install -y docker-ce docker-ce-cli containerd.io
 
 # 启动Docker服务（若未自动启动）
@@ -757,8 +754,6 @@ docker ps
 
 [![ylDKoa.md.png](https://i.imgs.ovh/2026/02/08/ylDKoa.md.png)](https://imgloc.com/image/ylDKoa)
 
----
-
 2. 下载 rknn-toolkit2 的 Dockerfile
 
 ```shell
@@ -772,14 +767,9 @@ sudo git clone https://gitee.com/cddssgl/rknn-toolkit2.git
 cd rknn-toolkit2/rknn-toolkit2/docker/docker_file/ubuntu_20_04_cp38
 
 # 2. 修改 Dockerfile 源（解决 pip 安装依赖失败问题）
-# 将默认的不稳定源替换为阿里云镜像源，否则会因为网络问题导致安装失败
 sudo sed -i 's|mirror.baidu.com|mirrors.aliyun.com|g' Dockerfile_ubuntu_20_04_for_cp38
 
-# 3.构建命令说明：
-# -f：指定 Dockerfile 路径（必须显式指定，否则会找默认的 Dockerfile）
-# -t：给镜像打标签（格式：名称:版本，这里用 rknn-toolkit2:cp38-2.3.2 明确标识 Python 版本和工具包版本）
-# .：构建上下文（当前目录，Docker 会读取目录内的 whl 包和源配置文件）
-# 注意：若未配置 docker 用户组权限，需加 sudo
+# 3. 构建镜像
 sudo docker build -f Dockerfile_ubuntu_20_04_for_cp38 -t rknn-toolkit2:cp38-2.3.2 .
 
 # 4. 验证镜像是否构建成功
@@ -788,20 +778,14 @@ sudo docker images | grep rknn-toolkit2:cp38-2.3.2
 
 [![ylDGWC.md.png](https://i.imgs.ovh/2026/02/08/ylDGWC.md.png)](https://imgloc.com/image/ylDGWC)
 
----
-
 3. 挂载启动 docker 容器
 
 ```shell
-# 1.先创建本地工作目录（用于存放 RK 模型、测试脚本、输出结果）
+# 1.先创建本地工作目录
 sudo mkdir -p /opt/rknn-toolkit2/workspace
 cd /opt/rknn-toolkit2/workspace
 
 # 2.启动命令（挂载本地目录+映射 8888 端口）
-# 本地目录 ~/rknn_workspace 挂载到容器的 /root/workspace（双向同步）
-# 本地 8888 端口映射到容器 8888 端口（用于运行 Jupyter Notebook）
-# 容器名称
-# 启动后进入 bash 终端
 sudo docker run -it --privileged --rm \
   -v /opt/rknn-toolkit2/workspace:/root/workspace \
   -p 8888:8888 \
@@ -809,10 +793,7 @@ sudo docker run -it --privileged --rm \
   rknn-toolkit2:cp38-2.3.2 /bin/bash
 
 # 3.进入容器后执行以下命令
-# 检查 Python 版本（应为 3.8.x）
 python3 --version
-
-# 导入 RKNN 模块（无报错即成功）
 python3 -c "from rknn.api import RKNN; print('RKNN 导入成功！版本：2.3.2')"
 ```
 
@@ -839,7 +820,9 @@ docker rmi rknn-toolkit2:cp38-2.3.2
 
 ### 3.2 转换模型
 
-**注意**：此时环境为 Ubuntu 主机环境，容器只是用于执行转换脚本，所有模型文件挂载在主机目录下/opt/rknn-toolkit2/workspace 中。
+```{note}
+此时环境为 Ubuntu 主机环境，容器只是用于执行转换脚本，所有模型文件挂载在主机目录下 `/opt/rknn-toolkit2/workspace` 中。
+```
 
 ```shell
 # 1. 克隆 rknn_model_zoo 仓库，使用脚本文件转换模型
@@ -853,19 +836,14 @@ chmod +x best.onnx
 sudo cp best.onnx /opt/rknn-toolkit2/workspace/rknn_model_zoo/examples/yolov8/python/
 ```
 
-**注意**：下面环境为 rknn-toolkit2:cp38-2.3.2 容器内，需要在容器内执行转换脚本。
+```{note}
+下面环境为 rknn-toolkit2:cp38-2.3.2 容器内，需要在容器内执行转换脚本。
+```
 
 ```shell
-# 1. 若未启动docker容器，挂载启动 rknn-toolkit2 容器
-#sudo docker run -it --privileged --rm \
-#  -v /opt/rknn-toolkit2/workspace:/root/workspace \
-#  -p 8888:8888 \
-#  --name rknn-cp38-container \
-#  rknn-toolkit2:cp38-2.3.2 /bin/bash
-
 cd /root/workspace/rknn_model_zoo/examples/yolov8/python
 # pip uninstall onnx  # (可选)：可能会因为onnx版本过高导致转换失败
-# pip install "onnx==1.14.1" # (可选)：可能会因为onnx版本过高导致转换失败
+# pip install "onnx==1.14.1" # (可选)
 python convert.py best.onnx rk3588
 
 # 转换完成后，将模型文件复制到主机目录下
@@ -879,7 +857,9 @@ sudo cp yolov8n.rknn /home/k/
 
 ## 4. 端侧测试
 
-**注意**：下面环境为端侧环境，使用 RKNN-Toolkit-Lite2 python 接口测试模型。
+```{note}
+下面环境为端侧环境，使用 RKNN-Toolkit-Lite2 python 接口测试模型。
+```
 
 ```shell
 # 1. 安装 RKNN-Toolkit-Lite2 python 包
@@ -888,7 +868,7 @@ pip3 install rknn-toolkit-lite2
 # 2. 测试是否安装成功
 python3 -c "from rknnlite.api import RKNNLite; print('RKNNLite 导入成功！版本：2.3.2')"
 
-# 2. 上传模型文件和测试图片到端侧目录
+# 3. 上传模型文件和测试图片到端侧目录
 mkdir -p /opt/rknn-toolkit2-lite
 cd /opt/rknn-toolkit2-lite
 
@@ -896,13 +876,11 @@ cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/yolov8.rknn /opt/rknn-toolk
 cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/butter.jpg /opt/rknn-toolkit2-lite/
 cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/test.py /opt/rknn-toolkit2-lite/
 
-# 3. 运行测试脚本
+# 4. 运行测试脚本
 python3 test.py
 ```
 
 [![ylDiNF.md.jpeg](https://i.imgs.ovh/2026/02/08/ylDiNF.md.jpeg)](https://imgloc.com/image/ylDiNF)
-
----
 
 ## 5. 人手跟随(拓展)
 
@@ -925,15 +903,15 @@ python3 test.py
 | **拷贝到 ROS msg** | memcpy (C++ 标准库)          | **CPU**        | **这里是唯一的 CPU 重活**。CPU 把 GStreamer 的 Buffer 里的数据拷贝到 ROS 消息的 std::vector 中。（注：这是为了生成 ROS 消息，后续传输才是零拷贝）。 |
 | **发布消息**       | pub->publish(std::move(msg)) | **(无)**       | 这是一个软件行为。std::move 转移了指针所有权，**避免了** CPU 进行节点间的数据拷贝。                                                                 |
 
-**节点 2: rk_inference (推理与绘图 —— 核心)**
+**节点 2: rk_inference (推理与绘图 -- 核心)**
 
 | **流程描述**        | **关键代码 / 工具**                              | **触发的硬件** | **硬件在做什么？**                                                                                                                           |
 | ------------------- | ------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **准备 Buffer**     | wrapbuffer_virtualaddr(...)                      | **(无)**       | 纯软件动作。只是告诉 RGA 驱动：“数据在这个内存地址，你记一下”。                                                                              |
+| **准备 Buffer**     | wrapbuffer_virtualaddr(...)                      | **(无)**       | 纯软件动作。只是告诉 RGA 驱动："数据在这个内存地址，你记一下"。                                                                              |
 | **缩放 + 格式转换** | **imresize(src, dst)** 或 imcvtcolor (librga 库) | **RGA**        | **核心触发点！** 这行代码向 RGA 寄存器发送指令。**RGA 硬件**启动，瞬间把 1080P NV12 读入，处理成 640x640 RGB，写回内存。CPU 等待或做别的事。 |
 | **NPU 推理**        | **rknn_run(ctx, ...)** (rknn_api 库)             | **NPU**        | **核心触发点！** 这行代码唤醒 **NPU 硬件**。NPU 加载模型权重，对 640x640 的数据进行数万亿次矩阵运算。                                        |
 | **后处理**          | if (conf > 0.5) ... (C++ 逻辑)                   | **CPU**        | 解析 NPU 输出的浮点数，计算坐标 (x,y,w,h)。这是简单的逻辑判断，CPU 做这个很快。                                                              |
-| **RGA 绘图**        | **imdrawrect(src, rect, ...)** (librga 库)       | **RGA**        | **核心触发点！** 代码告诉 **RGA 硬件**：“在 src 这个 NV12 图片的 (x,y) 位置，把像素值改成红色”。RGA 直接修改内存，不用 CPU 逐个像素去画。    |
+| **RGA 绘图**        | **imdrawrect(src, rect, ...)** (librga 库)       | **RGA**        | **核心触发点！** 代码告诉 **RGA 硬件**："在 src 这个 NV12 图片的 (x,y) 位置，把像素值改成红色"。RGA 直接修改内存，不用 CPU 逐个像素去画。    |
 | **发布**            | pub->publish(std::move(msg))                     | **(无)**       | 指针传递，零拷贝。                                                                                                                           |
 
 **节点 3: rk_streamer (推流)**
@@ -952,11 +930,10 @@ python3 test.py
 
 ```bash
 # 1. 安装 GStreamer 及其插件（包含 app 库）
-# 从清华镜像源安装 GStreamer 及其插件
 sudo sed -i 's/mirrors.tuna.tsinghua.edu.cn/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
 sudo apt-get update
 
-# 编译安装 Rockchip 多媒体组件 , 包含编译器、构建系统、基础 GStreamer 库及 libdrm
+# 编译安装 Rockchip 多媒体组件
 sudo apt-get install -y --fix-missing gcc g++ cmake meson ninja-build \
     libdrm-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
@@ -978,21 +955,13 @@ sudo make install
 sudo ldconfig
 cd ../..
 
-# 2.3 安装 librga (使用预编译库)
-# RGA 硬件加速库，gstreamer-rockchip 依赖此库
-# 使用 Gitee 官方仓库的预编译库，无需编译
+# 4. 安装 librga (使用预编译库)
 git clone https://gitee.com/airockchip/librga.git --depth=1
 cd librga
-
-# 安装头文件
 sudo cp -r include/* /usr/local/include/
-
-# 安装库文件 (适配 RK3588/aarch64)
-# 包含 .so 动态库
 sudo cp -r libs/Linux/gcc-aarch64/* /usr/local/lib/
 
-# 手动创建 pkgconfig 文件 (源码包中未提供)
-# 必须创建此文件，meson 才能找到 librga
+# 手动创建 pkgconfig 文件
 sudo mkdir -p /usr/local/lib/pkgconfig
 sudo tee /usr/local/lib/pkgconfig/librga.pc > /dev/null <<EOF
 prefix=/usr/local
@@ -1007,55 +976,32 @@ Libs: -L\${libdir} -lrga
 Cflags: -I\${includedir}
 EOF
 
-# 更新动态库缓存
 sudo ldconfig
 cd ..
 
-# 5. 编译安装 gstreamer-rockchip 插件 (使用 Gitee 镜像)
-# 由于 GitHub 连接不稳定，推荐使用 Gitee 镜像
-# emancipator 仓库是 JeffyCN/mirrors (gstreamer-rockchip 分支) 的完整镜像
+# 5. 编译安装 gstreamer-rockchip 插件
 git clone https://gitee.com/emancipator/gstreamer-rockchip.git gstreamer-rockchip
 cd gstreamer-rockchip
-
-# 必须设置 PKG_CONFIG_PATH 确保能找到 librga
 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
-
 meson setup build --prefix=/usr --buildtype=release
 ninja -C build
 sudo ninja -C build install
 
 # 6. 更新库缓存并验证
 gst-inspect-1.0 | grep mpp
-
-#信息输出如下
-rockchipmpp:  mpph264enc: Rockchip Mpp H264 Encoder
-rockchipmpp:  mpph265enc: Rockchip Mpp H265 Encoder
-rockchipmpp:  mppvp8enc: Rockchip Mpp VP8 Encoder
-rockchipmpp:  mppjpegenc: Rockchip Mpp JPEG Encoder
-rockchipmpp:  mppvideodec: Rockchip's MPP video decoder
-rockchipmpp:  mppjpegdec: Rockchip's MPP JPEG image decoder
 ```
 
----
-
-### 2.1 安装 RTSP 推流服务器
+### 2.2 安装 RTSP 推流服务器
 
 ```bash
 # 1. 安装 ROS2 依赖
 sudo apt-get install -y ros-humble-image-transport ros-humble-cv-bridge
 
 # 2. 安装 RTSP 推流服务器 (go2rtc)
-# go2rtc 是一个轻量级、零依赖的流媒体服务器，支持 RTSP/WebRTC/HLS 等多种协议
-# 建议直接下载二进制文件到 /usr/local/bin
 wget https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_arm64 -O /usr/local/bin/go2rtc
 chmod +x /usr/local/bin/go2rtc
 
-# 3. 配置与自启动，配合foxglove实现推流视频可视化
-# 3.1 创建配置文件 /etc/go2rtc.yaml
-# 使用以下命令创建最小化配置，开启 RTSP 和 WebRTC
-# 注意：api 模块默认监听 1984 端口，提供 Web 管理界面
-# 关键修正：streams 列表必须留空！因为 rk_streamer 会主动推流上来，
-# 如果在这里配置了 camera 地址，会导致 go2rtc 尝试自我拉流从而产生死循环。
+# 3. 创建配置文件 /etc/go2rtc.yaml
 sudo bash -c 'cat <<EOF > /etc/go2rtc.yaml
 streams:
   camera: null
@@ -1072,8 +1018,7 @@ webrtc:
     - 192.168.22.219:8555 # 请修改为你的板卡实际 IP
 EOF'
 
-# 3.2 设置go2rtc开机自启动 (Systemd 服务)
-# 注意：WorkDir 设置为 /etc/ 以便读取配置文件
+# 4. 设置go2rtc开机自启动 (Systemd 服务)
 sudo bash -c 'cat <<EOF > /etc/systemd/system/go2rtc.service
 [Unit]
 Description=Go2RTC Media Server
@@ -1089,29 +1034,25 @@ User=root
 WantedBy=multi-user.target
 EOF'
 
-# 3.3 启用并启动服务
+# 5. 启用并启动服务
 sudo systemctl daemon-reload
 sudo systemctl enable go2rtc
 sudo systemctl start go2rtc
 ```
 
-## 2. RKNN-NPU 部署
+## 3. RKNN-NPU 部署
 
 在进行 NPU 推理开发前，必须确保系统已启用 RGA 硬件加速驱动，并安装了用户态库文件 (`librga`)。
 RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，可用于加速点/线绘制，执行图像缩放、旋转、bitBlt、alpha 混合等常见的 2D 图形操作。
 
 [![ylMjpO.md.png](https://i.imgs.ovh/2026/02/08/ylMjpO.md.png)](https://imgloc.com/image/ylMjpO)
 
----
-
-## 3. RTSP 推流
+## 4. RTSP 推流
 
 当 `rk_streamer` 正常运行后，它会主动将视频流推送到 `rtsp://127.0.0.1:8554/camera`。
 在网页输入 `http://192.168.22.219:1984/stream.html?src=camera` 即可查看推流视频。
 
 [![ylMbvL.md.png](https://i.imgs.ovh/2026/02/08/ylMbvL.md.png)](https://imgloc.com/image/ylMbvL)
-
----
 
 # 七、SLAM 部署
 
@@ -1130,7 +1071,7 @@ sudo apt install -y ros-humble-slam-toolbox ros-humble-navigation2 \
 
 ## 2. 配置功能包
 
-为了实现“在线建图”、“发布 map->odom 变换”以及“雷达后方裁剪”的功能，需进行以下配置。
+为了实现"在线建图"、"发布 map->odom 变换"以及"雷达后方裁剪"的功能，需进行以下配置。
 
 ### 2.1 雷达数据裁剪 (Laser Filters)
 
@@ -1185,7 +1126,7 @@ slam_toolbox:
     odom_frame: odom
     map_frame: map
     base_frame: base_link
-    scan_topic: /scan_filtered # 注意：订阅经过裁剪后的雷达话题
+    scan_topic: /scan_filtered
     mode: localization
 
     # 更多参数参考模板...
@@ -1196,7 +1137,7 @@ slam_toolbox:
 
 ## 3. SLAM 在线建图/存图
 
-- `slam.launch.py` 启动 SLAM 建图功能，实现在线建图。调用`save_map.sh`脚本保存地图。
+- `slam.launch.py` 启动 SLAM 建图功能，实现在线建图。调用 `save_map.sh` 脚本保存地图。
 - `localization.launch.py` 启动雷达数据裁剪+定位功能，根据静态地图与实时雷达数据进行匹配，发布 `map` -> `odom` 的 TF 变换。
 - `laser_filters.launch.py` 仅启动雷达数据裁剪功能，将 `/scan` 话题裁剪为 `/scan_filtered`，依赖 Nav2 功能包的 AMCL + Map Server，发布 `map` -> `odom` 的 TF 变换。
 
@@ -1207,12 +1148,11 @@ cd ~/hy_linux/nfs/hy_ros
 
 # 注意：若未配置udev规则，请先执行，然后重新插拔雷达
 sudo bash src/ldlidar_driver_ros2/scripts/Ldlidar_udev.sh
-# 执行后运行ls -l /dev/ldlidar_serial,确认是否有 /dev/ldlidar_serial 设备文件,成功则继续向后执行
 
 # 1. 编译
 colcon build --packages-select ldlidar_driver_ros2
 
-# 2. 运行雷达，确保发布话题为 /scan，frame_id 配置为 radar_Link
+# 2. 运行雷达
 source install/setup.bash
 ros2 launch ldlidar_driver_ros2 ldlidar_driver.launch.py
 ```
@@ -1231,7 +1171,9 @@ ros2 launch hy_slam slam.launch.py
 
 3. 保存地图
 
-**重要**：请在 **`slam.launch.py` 仍在运行**时执行保存脚本。若先终止 SLAM 程序，内存中的地图数据将丢失，导致无法保存。
+```{warning}
+请在 `slam.launch.py` 仍在运行时执行保存脚本。若先终止 SLAM 程序，内存中的地图数据将丢失，导致无法保存。
+```
 
 完成建图后，打开一个新的终端执行以下脚本：
 
@@ -1250,54 +1192,56 @@ cd ~/hy_linux/nfs/hy_ros
 
 使用 Foxglove Studio 查看实时建图效果。
 
-1.  **客户端连接**：
-    - 在 PC 上打开 Foxglove Studio。
-    - 选择 **Open Connection** -> **Foxglove WebSocket**。
-    - 地址输入：`ws://<机器人IP>:8765`。
+1. **客户端连接**：
+   - 在 PC 上打开 Foxglove Studio。
+   - 选择 **Open Connection** -> **Foxglove WebSocket**。
+   - 地址输入：`ws://<机器人IP>:8765`。
 
-2.  **配置面板**：
-    - 添加 **2D Panel**。
-    - 在左侧 Topics 勾选：
-      - `/map` (SLAM 地图)
-      - `/scan` (原始雷达)
-      - `/scan_filtered` (裁剪后雷达)
-      - TF 树 (确保 `map` -> `odom` -> `base_link` -> `radar_Link` 连通)。
+2. **配置面板**：
+   - 添加 **2D Panel**。
+   - 在左侧 Topics 勾选：
+     - `/map` (SLAM 地图)
+     - `/scan` (原始雷达)
+     - `/scan_filtered` (裁剪后雷达)
+     - TF 树 (确保 `map` -> `odom` -> `base_link` -> `radar_Link` 连通)。
 
----
-
-/scan雷达数据可视化
+/scan 雷达数据可视化
 
 [![ylMzsx.md.png](https://i.imgs.ovh/2026/02/08/ylMzsx.md.png)](https://imgloc.com/image/ylMzsx)
 
----
-
-/map地图可视化
+/map 地图可视化
 
 [![ylMq4e.md.png](https://i.imgs.ovh/2026/02/08/ylMq4e.md.png)](https://imgloc.com/image/ylMq4e)
-
----
 
 ## 5. 定位模式
 
 若已构建地图，可切换至纯定位模式运行（不再更新地图，仅进行定位）：
 
-1.  **方式一：使用 slam_toolbox 进行定位**
-    该模式下，`slam_toolbox` 会加载静态地图，并将实时雷达数据与地图匹配，发布 `map` -> `odom` 变换。
+1. **方式一：使用 slam_toolbox 进行定位**
 
-    ```bash
-    # 启动定位模式（默认加载 my_map）
-    ros2 launch hy_slam localization.launch.py
-    ```
+   该模式下，`slam_toolbox` 会加载静态地图，并将实时雷达数据与地图匹配，发布 `map` -> `odom` 变换。
 
-2.  **方式二：使用 Nav2 (AMCL) 进行定位**（推荐用于导航）
-    若后续使用 Nav2 导航栈，通常由 `amcl` 节点负责定位，`map_server` 负责发布地图。此时 `hy_slam` 仅需提供雷达数据裁剪。
-    - **步骤 1**：启动雷达滤波器（仅发布 /scan_filtered）
-      ```bash
-      ros2 launch hy_slam laser_filter_only.launch.py
-      ```
-    - **步骤 2**：启动 Nav2 (AMCL + Map Server)
-      _(需在 Nav2 启动文件中配置加载 `install/hy_slam/share/hy_slam/map/my_map.yaml`)_
+   ```bash
+   # 启动定位模式（默认加载 my_map）
+   ros2 launch hy_slam localization.launch.py
+   ```
 
-**注意**：无论哪种方式，定位模式下**必须**发布雷达数据 (`/scan_filtered`)。
+2. **方式二：使用 Nav2 (AMCL) 进行定位**（推荐用于导航）
+
+   若后续使用 Nav2 导航栈，通常由 `amcl` 节点负责定位，`map_server` 负责发布地图。此时 `hy_slam` 仅需提供雷达数据裁剪。
+
+   - **步骤 1**：启动雷达滤波器（仅发布 /scan_filtered）
+
+     ```bash
+     ros2 launch hy_slam laser_filter_only.launch.py
+     ```
+
+   - **步骤 2**：启动 Nav2 (AMCL + Map Server)
+
+     _(需在 Nav2 启动文件中配置加载 `install/hy_slam/share/hy_slam/map/my_map.yaml`)_
+
+```{important}
+无论哪种方式，定位模式下**必须**发布雷达数据 (`/scan_filtered`)。
+```
 
 # 八、Nav2 部署

@@ -1,5 +1,7 @@
 # 🏠 项目主页
 
+**注意**：项目文档档文目正在完善中，敬请期待。
+
 # 🛒 购买链接
 
 > 🐟 **闲鱼搜索**：`鸿尘客`
@@ -16,7 +18,7 @@
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
 | 个人博客                 | [https://zhcmqtt.top](https://zhcmqtt.top)                                                                             |
 | CSDN博客                 | [https://blog.csdn.net](https://blog.csdn.net/weixin_46477159?spm=1000.2115.3001.5343)                                 |
-| 立创硬件开源             | [https://x.jlc.com](https://oshwhub.com/nhwjxzxz/esp32-ping-mu)                                                        |
+| 立创硬件开源             | [https://x.jlc.com]( https://oshwhub.com/nhwjxzxz/huang-you-ji-qi-ren)                                                        |
 | GitHub——ROS算法开源      | [https://github.com/zhanghongchen1213/hy_ros](https://github.com/zhanghongchen1213/hy_ros)                             |
 | GitHub——驱动器算法开源   | [https://github.com/zhanghongchen1213/hy_driver](https://github.com/zhanghongchen1213/hy_driver)                       |
 | GitHub——yolo训练算法开源 | [https://github.com/zhanghongchen1213/butter_yolov8n_train](https://github.com/zhanghongchen1213/butter_yolov8n_train) |

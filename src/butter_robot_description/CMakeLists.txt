@@ -11,8 +11,15 @@ find_package(urdf REQUIRED)
 
 # 2.新增安装目录
 install(
-  DIRECTORY launch meshes urdf
+  DIRECTORY launch meshes urdf scripts
   DESTINATION share/${PROJECT_NAME}
+  USE_SOURCE_PERMISSIONS
+)
+
+# 3.安装Python脚本
+install(
+  PROGRAMS scripts/dynamic_tf_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

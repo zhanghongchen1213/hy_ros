@@ -27,19 +27,16 @@ def generate_launch_description():
     )
 
     # 2. SLAM (Slam Toolbox)
-    # 使用 /scan_filtered 进行建图
+    # ✅ 修复：使用 /scan_filtered（laser_filter配置了keep_point_count保持点数恒定）
     slam_node = Node(
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
         name='slam_toolbox',
         parameters=[slam_params_file, {'use_sim_time': False}],
-        remappings=[
-            ('/scan', '/scan_filtered')
-        ],
         output='screen'
     )
 
     return LaunchDescription([
-        laser_filter_node,
+        # laser_filter_node,  # ✅ 重新启用：使用keep_point_count参数避免点数变化
         slam_node
     ])

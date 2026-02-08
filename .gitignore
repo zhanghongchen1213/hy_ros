@@ -4,3 +4,4 @@ build
 source/*.*
 source/butter_img 
 .trae/documents
+node_modules

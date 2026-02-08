@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # 基础编程规则 (Basic Programming Rules) - 场景 A: 嵌入式开发
 
 ## 🎯 核心目标

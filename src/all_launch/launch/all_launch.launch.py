@@ -80,62 +80,62 @@ def generate_launch_description():
             ]
         ),
         
-        # # 8. 视觉管道 (rk_camera + rk_inference + rk_streamer)
-        # # 使用 ComposableNodeContainer 将它们运行在同一个进程容器中，启用零拷贝通信
-        # ComposableNodeContainer(
-        #     name='butter_vision_container',
-        #     namespace='',
-        #     package='rclcpp_components',
-        #     executable='component_container',
-        #     composable_node_descriptions=[
-        #         # 8.1 rk_camera 组件
-        #         ComposableNode(
-        #             package='rk_camera',
-        #             plugin='RkCamera',
-        #             name='rk_camera',
-        #             parameters=[
-        #                 {'device_id': 0},
-        #                 {'width': 1920},
-        #                 {'height': 1080},
-        #                 {'framerate': 30},
-        #                 {'rotation_180': True},
-        #                 {'sub_control_topic': '/uart/enable_butter_yolo'},
-        #                 {'pub_image_topic': '/yolo/image_raw'},
-        #                 {'debug_fps': False}
-        #             ],
-        #             extra_arguments=[{'use_intra_process_comms': True}]
-        #         ),
-        #         # 8.2 rk_inference 组件
-        #         ComposableNode(
-        #             package='rk_inference',
-        #             plugin='RkInference',
-        #             name='rk_inference',
-        #             parameters=[
-        #                 {'sub_topic': '/yolo/image_raw'}, # 订阅 rk_camera
-        #                 {'pub_topic': '/yolo/image_infer'}, # 发布推流图像
-        #                 {'model_path': '/opt/rknn-toolkit2-lite/yolov8.rknn'},
-        #                 {'conf_threshold': 0.5},
-        #                 {'nms_threshold': 0.45}
-        #             ],
-        #             extra_arguments=[{'use_intra_process_comms': True}]
-        #         ),
-        #         # 8.3 rk_streamer 组件
-        #         ComposableNode(
-        #             package='rk_streamer',
-        #             plugin='RkStreamer',
-        #             name='rk_streamer',
-        #             parameters=[
-        #                 {'width': 1920},
-        #                 {'height': 1080},
-        #                 {'fps': 30},
-        #                 {'sub_topic': '/yolo/image_infer'}, # 订阅 rk_inference 发布的话题
-        #                 {'pipeline': 'appsrc name=source ! video/x-raw,format=NV12 ! videoconvert ! mpph264enc ! h264parse config-interval=-1 ! rtspclientsink location=rtsp://127.0.0.1:8554/camera protocols=tcp'}
-        #             ],
-        #             extra_arguments=[{'use_intra_process_comms': True}]
-        #         )
-        #     ],
-        #     output='screen',
-        # )
+        # 8. 视觉管道 (rk_camera + rk_inference + rk_streamer)
+        # 使用 ComposableNodeContainer 将它们运行在同一个进程容器中，启用零拷贝通信
+        ComposableNodeContainer(
+            name='butter_vision_container',
+            namespace='',
+            package='rclcpp_components',
+            executable='component_container',
+            composable_node_descriptions=[
+                # 8.1 rk_camera 组件
+                ComposableNode(
+                    package='rk_camera',
+                    plugin='RkCamera',
+                    name='rk_camera',
+                    parameters=[
+                        {'device_id': 0},
+                        {'width': 1920},
+                        {'height': 1080},
+                        {'framerate': 30},
+                        {'rotation_180': True},
+                        {'sub_control_topic': '/uart/enable_butter_yolo'},
+                        {'pub_image_topic': '/yolo/image_raw'},
+                        {'debug_fps': False}
+                    ],
+                    extra_arguments=[{'use_intra_process_comms': True}]
+                ),
+                # 8.2 rk_inference 组件
+                ComposableNode(
+                    package='rk_inference',
+                    plugin='RkInference',
+                    name='rk_inference',
+                    parameters=[
+                        {'sub_topic': '/yolo/image_raw'}, # 订阅 rk_camera
+                        {'pub_topic': '/yolo/image_infer'}, # 发布推流图像
+                        {'model_path': '/opt/rknn-toolkit2-lite/yolov8.rknn'},
+                        {'conf_threshold': 0.5},
+                        {'nms_threshold': 0.45}
+                    ],
+                    extra_arguments=[{'use_intra_process_comms': True}]
+                ),
+                # 8.3 rk_streamer 组件
+                ComposableNode(
+                    package='rk_streamer',
+                    plugin='RkStreamer',
+                    name='rk_streamer',
+                    parameters=[
+                        {'width': 1920},
+                        {'height': 1080},
+                        {'fps': 30},
+                        {'sub_topic': '/yolo/image_infer'}, # 订阅 rk_inference 发布的话题
+                        {'pipeline': 'appsrc name=source ! video/x-raw,format=NV12 ! videoconvert ! mpph264enc ! h264parse config-interval=-1 ! rtspclientsink location=rtsp://127.0.0.1:8554/camera protocols=tcp'}
+                    ],
+                    extra_arguments=[{'use_intra_process_comms': True}]
+                )
+            ],
+            output='screen',
+        )
         
         # 9. slam节点
         

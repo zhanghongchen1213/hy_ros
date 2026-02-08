@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # 基础编程规则 (Basic Programming Rules) - 场景C: AI 深度学习
 
 ## 🎯 核心目标

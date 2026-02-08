@@ -1,8 +1,6 @@
 ---
 alwaysApply: false
-description: 项目建立初期，仅在项目启动时，且项目中存在静态需求文档 (`spec.md`) 时生效。
 ---
-
 # 计划生成 Agent 规则 (Plan Generation Agent Rules)
 
 ## 🧙‍♂️ 角色定义：项目“向导” (The Guide & Strategist)

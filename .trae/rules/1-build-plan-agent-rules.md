@@ -1,8 +1,6 @@
 ---
 alwaysApply: false
-description: 项目建立初期，仅在项目启动时生效。
 ---
-
 # 构建计划 Agent 规则 (Build Plan Agent Rules)
 
 ## 🧙‍♂️ 角色定义：项目“老大哥” (The Architect & Rule Maker)

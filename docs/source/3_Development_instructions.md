@@ -16,22 +16,13 @@ chmod +x fishros
 # 1:中科大镜像源 -> 1:humble(ROS2) -> 1:humble(ROS2)桌面版 -> 开始自动安装等待20min左右
 ```
 
-```{figure} _static/5134F256-24EA-4568-9E1A-90A9392EEEA8.png
-:alt: ROS2 安装界面
-:width: 100%
-:align: center
-```
+[![ylDjRa.md.png](https://i.imgs.ovh/2026/02/08/ylDjRa.md.png)](https://imgloc.com/image/ylDjRa)
 
 - 可在主机环境按照相同方法同步配置完 ros2 后，测试双端通信是否成功
-
   - 端侧：`ros2 run demo_nodes_cpp talker`
   - 主机侧：`ros2 run demo_nodes_cpp listener`
 
-```{figure} _static/2D377DF7-6518-45F7-B95B-6FD6E9846352.png
-:alt: 通信测试
-:width: 100%
-:align: center
-```
+[![ylDFP4.md.png](https://i.imgs.ovh/2026/02/08/ylDFP4.md.png)](https://imgloc.com/image/ylDFP4)
 
 ---
 
@@ -150,22 +141,13 @@ chmod +x fishros
 # 1:中科大镜像源 -> 1:humble(ROS2) -> 1:humble(ROS2)桌面版 -> 开始自动安装等待20min左右
 ```
 
-```{figure} _static/5134F256-24EA-4568-9E1A-90A9392EEEA8.png
-:alt: ROS2 安装界面
-:width: 100%
-:align: center
-```
+[![ylDjRa.md.png](https://i.imgs.ovh/2026/02/08/ylDjRa.md.png)](https://imgloc.com/image/ylDjRa)
 
 - 可在主机环境按照相同方法同步配置完 ros2 后，测试双端通信是否成功
-
   - 端侧：`ros2 run demo_nodes_cpp talker`
   - 主机侧：`ros2 run demo_nodes_cpp listener`
 
-```{figure} _static/2D377DF7-6518-45F7-B95B-6FD6E9846352.png
-:alt: 通信测试
-:width: 100%
-:align: center
-```
+[![ylDFP4.md.png](https://i.imgs.ovh/2026/02/08/ylDFP4.md.png)](https://imgloc.com/image/ylDFP4)
 
 ## 4. 硬件测试
 
@@ -195,11 +177,7 @@ v4l2-ctl --list-formats-ext
 
 - 打开浏览器，输入**端侧 IP 地址加端口号**（如：http://192.168.22.188:8085）即可查看实时视频流
 
-```{figure} _static/3845F5C1-5EF4-48AD-A44E-9723432B73D7.png
-:alt: 摄像头推流
-:width: 100%
-:align: center
-```
+[![ylDTcN.md.png](https://i.imgs.ovh/2026/02/08/ylDTcN.md.png)](https://imgloc.com/image/ylDTcN)
 
 ### 4.2 雷达测试
 
@@ -224,19 +202,11 @@ sudo pip3 install pyserial
 python3 ldlidar_driver_python3.py
 ```
 
-```{figure} _static/C245E2A1-C5E6-403D-8423-C497E65EF1A5.png
-:alt: 雷达串口配置
-:width: 100%
-:align: center
-```
+[![ylDU8H.md.png](https://i.imgs.ovh/2026/02/08/ylDU8H.md.png)](https://imgloc.com/image/ylDU8H)
 
 ---
 
-```{figure} _static/2954D3EC-4FC1-4569-A884-389B75EA8267.png
-:alt: 雷达输出
-:width: 100%
-:align: center
-```
+[![ylDARQ.md.png](https://i.imgs.ovh/2026/02/08/ylDARQ.md.png)](https://imgloc.com/image/ylDARQ)
 
 ### 4.3 麦克风测试
 
@@ -309,11 +279,7 @@ ldd $(which sherpa-onnx)
 strings /lib/librknnrt.so | grep "librknnrt version"
 ```
 
-```{figure} _static/1EC69803-CE14-4303-8F42-F81402FB94D3.png
-:alt: rknnrt 版本检查
-:width: 100%
-:align: center
-```
+[![ylDRYF.md.png](https://i.imgs.ovh/2026/02/08/ylDRYF.md.png)](https://imgloc.com/image/ylDRYF)
 
 ---
 
@@ -354,19 +320,11 @@ sherpa-onnx-alsa \
   plughw:3,0
 ```
 
-```{figure} _static/BBCDEE94-3D50-4D23-892F-11A2EEAB23D4.png
-:alt: 模型解码
-:width: 100%
-:align: center
-```
+[![ylDg1m.md.png](https://i.imgs.ovh/2026/02/08/ylDg1m.md.png)](https://imgloc.com/image/ylDg1m)
 
 ---
 
-```{figure} _static/083E0A20-7679-4AFB-8526-9839DC6F158D.png
-:alt: 实时音频
-:width: 100%
-:align: center
-```
+[![ylDqT9.md.png](https://i.imgs.ovh/2026/02/08/ylDqT9.md.png)](https://imgloc.com/image/ylDqT9)
 
 ---
 
@@ -418,19 +376,11 @@ export LD_LIBRARY_PATH=./lib
 ./demo demo.jpg /opt/rknn-llm/qwen3-vl-2b_vision_rk3588.rknn /opt/rknn-llm/qwen3-vl-2b-instruct_w8a8_rk3588.rkllm 2048 4096 3
 ```
 
-```{figure} _static/EDB7D880-5FEF-4FD0-92C5-3C97A1CB05A9.png
-:alt: Qwen2-VL 运行
-:width: 100%
-:align: center
-```
+[![ylD5Qc.md.png](https://i.imgs.ovh/2026/02/08/ylD5Qc.md.png)](https://imgloc.com/image/ylD5Qc)
 
 ---
 
-```{figure} _static/71CD73B6-4883-4198-B71D-75B41F91C823.png
-:alt: Qwen2-VL 结果
-:width: 100%
-:align: center
-```
+[![ylDef6.md.png](https://i.imgs.ovh/2026/02/08/ylDef6.md.png)](https://imgloc.com/image/ylDef6)
 
 ## 3. 部署百度大模型音色复刻 TTS
 
@@ -476,19 +426,11 @@ export LD_LIBRARY_PATH=./lib
 
 ---
 
-```{figure} _static/{EE70FF84-01DA-4F41-B397-768A63B5CD34}.png
-:alt: 语音复刻模型
-:width: 100%
-:align: center
-```
+[![ylD9td.md.png](https://i.imgs.ovh/2026/02/08/ylD9td.md.png)](https://imgloc.com/image/ylD9td)
 
 ---
 
-```{figure} _static/3AA2DD25-37C9-448F-9655-7A191EE35A87.png
-:alt: 语音复刻模型测试
-:width: 100%
-:align: center
-```
+[![ylDMyg.md.png](https://i.imgs.ovh/2026/02/08/ylDMyg.md.png)](https://imgloc.com/image/ylDMyg)
 
 # 四、Foxglove Web 可视化配置
 
@@ -514,11 +456,7 @@ sudo apt-get install -y ros-humble-foxglove-bridge
 4. 输入端侧地址：`ws://192.168.22.219:8765` (IP 根据实际情况调整)。
 5. 连接成功后即可订阅和查看端侧的所有话题。
 
-```{figure} _static/{2BFCE0F0-25D7-44CC-A168-7EC55C00E17A}.png
-:alt: Foxglove 连接
-:width: 100%
-:align: center
-```
+[![ylDPg0.md.png](https://i.imgs.ovh/2026/02/08/ylDPg0.md.png)](https://imgloc.com/image/ylDPg0)
 
 # 五、 yolov8 目标检测模型训练
 
@@ -531,30 +469,15 @@ sudo apt-get install -y ros-humble-foxglove-bridge
 
 > - 本次训练使用 60%网络数据集 + 40%个人自定义数据集[butter_robot_dataset](https://universe.roboflow.com/butter-robot/butter_robot)，可自行下载删除修改
 
-> ```{figure} _static/{5F43021B-F98A-4638-9F1C-1A0F37A3776A}.png
-> :alt: 数据集标注
-> :width: 100%
-> :align: center
-> ```
+[![ylDQYY.md.png](https://i.imgs.ovh/2026/02/08/ylDQYY.md.png)](https://imgloc.com/image/ylDQYY)
 
-> ```{figure} _static/{C8DC5ACD-2155-4C45-84B2-37633DD7952A}.png
-> :alt: 数据集标注
-> :width: 100%
-> :align: center
-> ```
+[![ylDW3b.md.png](https://i.imgs.ovh/2026/02/08/ylDW3b.md.png)](https://imgloc.com/image/ylDW3b)
 
-> ```{figure} _static/{9EBE7DA9-24AF-410B-ADC4-2D899B346B32}.png
-> :alt: 数据集标注，划分
-> :width: 100%
-> :align: center
-> ```
+[![ylD2T1.md.png](https://i.imgs.ovh/2026/02/08/ylD2T1.md.png)](https://imgloc.com/image/ylD2T1)
 
 3. 数据集预处理包括数据增强、数据划分，下载 yolov8 数据集配置文件
-   > ```{figure} _static/{127BE14A-6CA8-428D-BD75-6139993EC29B}.png
-   > :alt: 数据集预处理
-   > :width: 100%
-   > :align: center
-   > ```
+
+[![ylDJuL.md.png](https://i.imgs.ovh/2026/02/08/ylDJuL.md.png)](https://imgloc.com/image/ylDJuL)
 
 ## 2. Win 环境实现模型训练
 
@@ -696,11 +619,7 @@ model.to("cuda:0")
 print("YOLOv8n已加载到GPU：", next(model.model.parameters()).is_cuda)
 ```
 
-```{figure} _static/{49D7297B-D52E-41BA-A49D-73379241B7F8}.png
-:alt: CUDA torch 训练yolov8n模型
-:width: 100%
-:align: center
-```
+[![ylD4eM.md.png](https://i.imgs.ovh/2026/02/08/ylD4eM.md.png)](https://imgloc.com/image/ylD4eM)
 
 ### 2.4 yolov8n 模型训练和转换
 
@@ -744,17 +663,9 @@ uv run tensorboard --logdir ../butter_train_results/yolov8n_butter --port 6006
 |                         |    cls_loss     |  0.7156  |  -   | 黄油类别预测损失              |
 |                         |    dfl_loss     |  1.3528  |  -   | 框分布拟合损失                |
 
-```{figure} _static/{BDB92C54-2B97-47F6-B043-25904817570B}.png
-:alt: 训练结果
-:width: 100%
-:align: center
-```
+[![ylDEKr.md.png](https://i.imgs.ovh/2026/02/08/ylDEKr.md.png)](https://imgloc.com/image/ylDEKr)
 
-```{figure} _static/{58DE5FE2-0846-4786-B6A4-96277B7DCC74}.png
-:alt: 训练结果
-:width: 100%
-:align: center
-```
+[![ylDlyh.md.png](https://i.imgs.ovh/2026/02/08/ylDlyh.md.png)](https://imgloc.com/image/ylDlyh)
 
 ---
 
@@ -776,11 +687,7 @@ print(f"导出完成: {success}")
 
 ---
 
-```{figure} _static/{8E78FC5C-2C5B-4F74-8142-60A877F1DF2C}.png
-:alt: 转换结果
-:width: 100%
-:align: center
-```
+[![ylDtge.md.png](https://i.imgs.ovh/2026/02/08/ylDtge.md.png)](https://imgloc.com/image/ylDtge)
 
 ---
 
@@ -848,11 +755,7 @@ newgrp docker
 docker ps
 ```
 
-```{figure} _static/{92D8EF11-C785-472C-A49D-47279682B9BF}.png
-:alt: 安装docker并配置自启
-:width: 100%
-:align: center
-```
+[![ylDKoa.md.png](https://i.imgs.ovh/2026/02/08/ylDKoa.md.png)](https://imgloc.com/image/ylDKoa)
 
 ---
 
@@ -883,11 +786,7 @@ sudo docker build -f Dockerfile_ubuntu_20_04_for_cp38 -t rknn-toolkit2:cp38-2.3.
 sudo docker images | grep rknn-toolkit2:cp38-2.3.2
 ```
 
-```{figure} _static/{C80D900A-898E-466E-B327-BF181D720242}.png
-:alt: 构建rknn-toolkit2镜像
-:width: 100%
-:align: center
-```
+[![ylDGWC.md.png](https://i.imgs.ovh/2026/02/08/ylDGWC.md.png)](https://imgloc.com/image/ylDGWC)
 
 ---
 
@@ -917,11 +816,7 @@ python3 --version
 python3 -c "from rknn.api import RKNN; print('RKNN 导入成功！版本：2.3.2')"
 ```
 
-```{figure} _static/{226E9997-8106-4E75-8877-A5CE700F1E8E}.png
-:alt: 挂载启动rknn-toolkit2容器
-:width: 100%
-:align: center
-```
+[![ylDmu4.md.png](https://i.imgs.ovh/2026/02/08/ylDmu4.md.png)](https://imgloc.com/image/ylDmu4)
 
 4. 常用容器管理命令
 
@@ -978,17 +873,9 @@ cd /root/workspace/rknn_model_zoo/examples/yolov8/model
 sudo cp yolov8n.rknn /home/k/
 ```
 
-```{figure} _static/{E8C4C09B-7AEC-407D-9658-738C793B8E71}.png
-:alt: 转换yolov8n模型
-:width: 100%
-:align: center
-```
+[![ylDXKH.md.png](https://i.imgs.ovh/2026/02/08/ylDXKH.md.png)](https://imgloc.com/image/ylDXKH)
 
-```{figure} _static/{F306641D-A9F8-4632-BDBD-72B502CCAAA6}.png
-:alt: 转换完成的模型位置
-:width: 100%
-:align: center
-```
+[![ylD3gX.md.png](https://i.imgs.ovh/2026/02/08/ylD3gX.md.png)](https://imgloc.com/image/ylD3gX)
 
 ## 4. 端侧测试
 
@@ -1013,11 +900,7 @@ cp /mnt/nfs/hy_ros/source/0.RK3588S/3.butter_yolov8n/test.py /opt/rknn-toolkit2-
 python3 test.py
 ```
 
-```{figure} _static/result.jpg
-:alt: 测试结果
-:width: 100%
-:align: center
-```
+[![ylDiNF.md.jpeg](https://i.imgs.ovh/2026/02/08/ylDiNF.md.jpeg)](https://imgloc.com/image/ylDiNF)
 
 ---
 
@@ -1153,12 +1036,6 @@ rockchipmpp:  mppvideodec: Rockchip's MPP video decoder
 rockchipmpp:  mppjpegdec: Rockchip's MPP JPEG image decoder
 ```
 
-```{figure} _static/{1C2440DD-4BCE-4C79-8951-C055DFBF109E}.png
-:alt: 测试结果
-:width: 100%
-:align: center
-```
-
 ---
 
 ### 2.1 安装 RTSP 推流服务器
@@ -1223,11 +1100,7 @@ sudo systemctl start go2rtc
 在进行 NPU 推理开发前，必须确保系统已启用 RGA 硬件加速驱动，并安装了用户态库文件 (`librga`)。
 RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，可用于加速点/线绘制，执行图像缩放、旋转、bitBlt、alpha 混合等常见的 2D 图形操作。
 
-```{figure} _static/{1C2440DD-4BCE-4C79-8951-C055DFBF109E}.png
-:alt: 测试结果
-:width: 100%
-:align: center
-```
+[![ylMjpO.md.png](https://i.imgs.ovh/2026/02/08/ylMjpO.md.png)](https://imgloc.com/image/ylMjpO)
 
 ---
 
@@ -1236,11 +1109,7 @@ RGA (Raster Graphic Acceleration Unit)是一个独立的 2D 硬件加速器，�
 当 `rk_streamer` 正常运行后，它会主动将视频流推送到 `rtsp://127.0.0.1:8554/camera`。
 在网页输入 `http://192.168.22.219:1984/stream.html?src=camera` 即可查看推流视频。
 
-```{figure} _static/image.png
-:alt: 测试结果
-:width: 100%
-:align: center
-```
+[![ylMbvL.md.png](https://i.imgs.ovh/2026/02/08/ylMbvL.md.png)](https://imgloc.com/image/ylMbvL)
 
 ---
 
@@ -1382,7 +1251,6 @@ cd ~/hy_linux/nfs/hy_ros
 使用 Foxglove Studio 查看实时建图效果。
 
 1.  **客户端连接**：
-
     - 在 PC 上打开 Foxglove Studio。
     - 选择 **Open Connection** -> **Foxglove WebSocket**。
     - 地址输入：`ws://<机器人IP>:8765`。
@@ -1395,28 +1263,20 @@ cd ~/hy_linux/nfs/hy_ros
       - `/scan_filtered` (裁剪后雷达)
       - TF 树 (确保 `map` -> `odom` -> `base_link` -> `radar_Link` 连通)。
 
---- 
+---
 
 /scan雷达数据可视化
-```{figure} _static/{4DC3D9CE-BEDD-4422-918D-975FD294427A}.png
-:alt: /scan雷达结果
-:width: 100%
-:align: center
-```
+
+[![ylMzsx.md.png](https://i.imgs.ovh/2026/02/08/ylMzsx.md.png)](https://imgloc.com/image/ylMzsx)
 
 ---
 
 /map地图可视化
-```{figure} _static/{4DC3D9CE-BEDD-4422-918D-975FD294427A}.png
-:alt: /map地图结果
-:width: 100%
-:align: center
-```
 
-
-
+[![ylMq4e.md.png](https://i.imgs.ovh/2026/02/08/ylMq4e.md.png)](https://imgloc.com/image/ylMq4e)
 
 ---
+
 ## 5. 定位模式
 
 若已构建地图，可切换至纯定位模式运行（不再更新地图，仅进行定位）：
@@ -1431,7 +1291,6 @@ cd ~/hy_linux/nfs/hy_ros
 
 2.  **方式二：使用 Nav2 (AMCL) 进行定位**（推荐用于导航）
     若后续使用 Nav2 导航栈，通常由 `amcl` 节点负责定位，`map_server` 负责发布地图。此时 `hy_slam` 仅需提供雷达数据裁剪。
-
     - **步骤 1**：启动雷达滤波器（仅发布 /scan_filtered）
       ```bash
       ros2 launch hy_slam laser_filter_only.launch.py

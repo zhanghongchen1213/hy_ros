@@ -1,3 +1,6 @@
+---
+alwaysApply: false
+---
 # 基础编程规则 (Basic Programming Rules) - 场景B: ROS 功能包
 
 ## 🎯 核心目标

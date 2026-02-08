@@ -1,7 +1,10 @@
 log
 install
 build
-source/*.*
-source/butter_img 
-.trae/documents
+/source/
+.trae
 node_modules
+_bmad
+_bmad-output
+.claude
+.bun

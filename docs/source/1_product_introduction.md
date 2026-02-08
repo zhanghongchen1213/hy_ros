@@ -31,12 +31,13 @@
 
 # 🔗 开源地址
 
-| 平台           | 链接                                                                                   |
-| -------------- | -------------------------------------------------------------------------------------- |
-| 个人博客       | [https://zhcmqtt.top](https://zhcmqtt.top)                                             |
-| CSDN博客       | [https://blog.csdn.net](https://blog.csdn.net/weixin_46477159?spm=1000.2115.3001.5343) |
-| 立创硬件开源   | [https://x.jlc.com](https://oshwhub.com/nhwjxzxz/esp32-ping-mu)                        |
-| GitHub项目开源 | [https://github.com](https://github.com/zhanghongchen1213/DIY_ESP32_DesktopScreen)     |
+| 平台           | 链接                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------- |
+| 个人博客       | [https://zhcmqtt.top](https://zhcmqtt.top)                                                              |
+| CSDN博客       | [https://blog.csdn.net](https://blog.csdn.net/weixin_46477159?spm=1000.2115.3001.5343)                  |
+| 立创硬件开源   | [https://x.jlc.com](https://oshwhub.com/nhwjxzxz/esp32-ping-mu)                                         |
+| GitHub项目开源 | [https://github.com](https://github.com/zhanghongchen1213/DIY_ESP32_DesktopScreen)                      |
+| 开发教程开源源 | [https://hy-ros.readthedocs.io](https://hy-ros.readthedocs.io/zh-cn/latest/1_product_introduction.html) |
 
 # 🎬 视频演示
 

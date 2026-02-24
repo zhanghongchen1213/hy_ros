@@ -43,10 +43,10 @@
 
 # 🎬 视频演示
 
-[![点击观看视频](https://i.imgs.ovh/2026/02/08/ylsonn.md.png)](https://ug.link/nas-zhang-GgrM/filemgr/share-download/?id=558c8c6a630d46f0b091d190e990fa9c)
+[![点击观看视频](https://i.imgs.ovh/2026/02/08/ylsonn.md.png)](https://www.bilibili.com/video/BV1hQcFzrEXS/?spm_id_from=333.1007.top_right_bar_window_history.content.click)
 
 > 📺 **视频作者**：B站 @鸿尘客
-> 🔗 **视频链接**：[桌面墨水屏摆件](https://ug.link/nas-zhang-GgrM/filemgr/share-download/?id=558c8c6a630d46f0b091d190e990fa9c)
+> 🔗 **视频链接**：[黄油机器人](https://www.bilibili.com/video/BV1hQcFzrEXS/?spm_id_from=333.1007.top_right_bar_window_history.content.click)
 
 # ⚙️ 硬件规格
 

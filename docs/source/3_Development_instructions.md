@@ -1245,3 +1245,411 @@ cd ~/hy_linux/nfs/hy_ros
 ```
 
 # 八、Nav2 部署
+
+本节介绍如何部署 Nav2 导航栈，实现"搜索黄油 → 导航抓取 → 返回起点"的自主任务。
+
+## 1. 端侧安装依赖
+
+在端侧（RK3588S）执行以下命令安装 Nav2 导航相关功能包：
+
+```bash
+sudo apt update
+sudo apt install -y \
+    ros-humble-navigation2 \
+    ros-humble-nav2-bringup \
+    ros-humble-nav2-simple-commander
+```
+
+```{important}
+本章节依赖第七章 SLAM 部署的功能包（`slam-toolbox`、`robot-localization`、`laser-filters`），若未安装请先完成第七章配置。同时需要第六章的视觉检测系统、底盘通信功能包（`uart`）和里程计融合功能包（`ekf_odom`）正常运行。
+```
+
+### 1.2 前置条件检查
+
+在开始 Nav2 部署前，请确认以下条件已满足：
+
+- ✅ 已完成第七章 SLAM 建图，地图文件保存在 `install/hy_slam/share/hy_slam/map/`
+- ✅ 已部署第六章视觉检测系统（YOLOv8 + RKNN NPU）
+- ✅ 底盘串口通信正常（UART 与 ESP32S3）
+- ✅ 里程计融合节点正常运行（EKF）
+- ✅ 雷达数据正常发布（`/scan` 话题）
+
+## 2. 系统架构设计
+
+### 1.1 整体架构
+
+导航系统采用分层设计，从上到下依次为：
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│  任务调度层 (Mission Layer)                              │
+│  - 状态机管理 (搜索/导航/抓取/返回)                       │
+│  - 目标点规划与发布                                       │
+│  - 视觉检测结果订阅                                       │
+└─────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│  导航规划层 (Nav2 Stack)                                 │
+│  - 全局路径规划 (NavFn)                                  │
+│  - 局部轨迹规划 (DWB)                                    │
+│  - 行为协调 (Behavior Tree)                              │
+└─────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│  定位感知层 (Localization & Perception)                  │
+│  - AMCL 粒子滤波定位                                     │
+│  - 代价地图构建 (静态层+障碍层+膨胀层)                    │
+│  - 雷达数据过滤 (laser_filters)                          │
+└─────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│  执行控制层 (Control Layer)                              │
+│  - 速度指令发布 (/cmd_vel)                               │
+│  - 底盘运动控制 (UART → ESP32S3)                         │
+│  - 舵机控制 (抓取动作)                                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 1.2 关键技术点
+
+- **TF 坐标变换链**：`map` → `odom` → `base_link` → `laser_link`
+- **零拷贝通信**：视觉检测节点与导航系统通过 ROS2 零拷贝传递目标位置
+- **代价地图融合**：静态地图 + 实时雷达障碍 + 安全膨胀区域
+
+## 2. 任务流程设计
+
+### 2.1 状态机设计
+
+任务执行采用有限状态机（FSM）管理，共 6 个状态：
+
+|          状态          | 说明          | 触发条件     | 输出动作           |
+| :--------------------: | :------------ | :----------- | :----------------- |
+|        **IDLE**        | 初始空闲      | 启动时       | 记录起点位姿       |
+|    **GO_TO_CENTER**    | 前往搜索中心  | 起点记录完成 | 发布导航目标       |
+|     **SEARCHING**      | 360° 旋转搜索 | 到达中心点   | 发布旋转速度指令   |
+| **NAVIGATE_TO_BUTTER** | 导航到黄油    | 检测到黄油   | 计算目标位姿并导航 |
+|      **GRASPING**      | 执行抓取      | 距离 < 0.3m  | 发布舵机控制指令   |
+|    **RETURN_HOME**     | 返回起点      | 抓取完成     | 导航回起点         |
+
+### 2.2 完整任务流程
+
+```text
+[启动]
+  ↓
+[记录当前位置作为起点]
+  ↓
+[导航到预设中心点 (center_x, center_y)]
+  ↓
+[原地旋转 360° 搜索黄油]
+  ↓
+[检测到黄油?] ──否──→ [继续旋转]
+  ↓ 是
+[停止旋转，计算黄油全局坐标]
+  ↓
+[导航到黄油位置]
+  ↓
+[距离 < 0.3m?] ──否──→ [继续接近]
+  ↓ 是
+[停止移动，发送抓取指令]
+  ↓
+[等待 3 秒（抓取动作执行）]
+  ↓
+[导航返回起点]
+  ↓
+[任务完成]
+```
+
+## 3. Nav2 核心组件
+
+### 3.1 定位模块 (AMCL)
+
+**功能**：基于粒子滤波的蒙特卡洛定位算法，融合雷达数据与里程计实现机器人在地图中的定位。
+
+**关键参数**：
+
+- `max_particles: 2000`：粒子数量，影响定位精度和计算量
+- `laser_model_type: likelihood_field`：激光模型类型
+- `update_min_d: 0.25`：移动 0.25m 触发一次更新
+- `update_min_a: 0.2`：旋转 0.2rad 触发一次更新
+
+**输出**：发布 `map` → `odom` 的 TF 变换
+
+### 3.2 全局规划器 (NavFn Planner)
+
+**功能**：基于 Dijkstra 算法在静态地图上规划从起点到终点的最优路径。
+
+**特点**：
+
+- 考虑静态障碍物和膨胀区域
+- 生成平滑的全局路径
+- 路径更新频率：20Hz
+
+### 3.3 局部规划器 (DWB Controller)
+
+**功能**：动态窗口法（Dynamic Window Approach）局部轨迹规划，实时避障。
+
+**工作原理**：
+
+1. 在速度空间采样多条候选轨迹（vx, vy, vθ）
+2. 对每条轨迹评分（路径跟随、目标接近、障碍避让）
+3. 选择得分最高的轨迹执行
+
+**关键参数**：
+
+- `max_vel_x: 0.15`：最大线速度 (m/s)
+- `max_vel_theta: 1.0`：最大角速度 (rad/s)
+- `sim_time: 1.5`：轨迹预测时间 (s)
+
+### 3.4 代价地图 (Costmap 2D)
+
+**功能**：构建机器人周围环境的代价地图，用于路径规划和避障。
+
+**三层结构**：
+
+1. **静态层 (Static Layer)**：加载 SLAM 构建的静态地图
+2. **障碍层 (Obstacle Layer)**：实时雷达检测的动态障碍物
+3. **膨胀层 (Inflation Layer)**：障碍物周围膨胀安全区域
+
+**全局 vs 局部代价地图**：
+
+- 全局代价地图：覆盖整个地图，用于全局路径规划
+- 局部代价地图：3m×3m 滚动窗口，用于局部避障
+
+## 4. 功能包结构
+
+### 4.1 hy_nav2 功能包目录结构
+
+```text
+hy_nav2/
+├── config/
+│   ├── nav2_params.yaml          # Nav2 核心参数配置
+│   └── map_server_params.yaml    # 地图服务器配置
+├── launch/
+│   ├── nav2_bringup.launch.py    # Nav2 导航栈启动
+│   └── butter_mission.launch.py  # 完整任务启动
+├── hy_nav2/
+│   ├── __init__.py
+│   └── butter_mission_node.py    # 任务调度节点
+├── package.xml
+└── setup.py
+```
+
+### 4.2 核心文件说明
+
+**nav2_params.yaml**
+
+- 包含 AMCL、控制器、规划器、代价地图等所有 Nav2 组件的参数
+- 需根据机器人实际尺寸调整 `robot_radius: 0.15`
+- 速度限制需与底盘实际能力匹配
+
+**butter_mission_node.py**
+
+- 实现状态机逻辑
+- 订阅 `/detections` 话题获取目标检测结果
+- 发布 `/cmd_vel` 控制机器人运动
+- 调用 Nav2 的 `NavigateToPose` Action 进行导航
+
+**nav2_bringup.launch.py**
+
+- 启动地图服务器（加载 SLAM 地图）
+- 启动 AMCL 定位节点
+- 启动 Nav2 导航栈（规划器、控制器、行为服务器）
+
+## 5. 开发流程
+
+### 5.1 配置文件编写
+
+**步骤 1：创建 Nav2 参数文件**
+
+在 `config/nav2_params.yaml` 中配置：
+
+- AMCL 定位参数（粒子数、更新阈值）
+- 控制器参数（速度限制、加速度限制）
+- 规划器参数（路径规划算法）
+- 代价地图参数（分辨率、膨胀半径）
+
+```{tip}
+可参考 Nav2 官方示例：`/opt/ros/humble/share/nav2_bringup/params/nav2_params.yaml`
+```
+
+**步骤 2：适配机器人参数**
+
+根据黄油机器人实际情况调整：
+
+- `robot_radius: 0.15`（机器人半径，单位：米）
+- `max_vel_x: 0.15`（最大线速度，与底盘能力匹配）
+- `inflation_radius: 0.35`（障碍物膨胀半径，确保安全距离）
+
+### 5.2 任务调度节点开发
+
+**核心功能实现**：
+
+1. **状态机管理**：使用 Python Enum 定义状态，在定时器回调中切换状态
+2. **Action Client**：调用 Nav2 的 `NavigateToPose` Action 发送导航目标
+3. **视觉融合**：订阅 `/detections` 话题，解析黄油位置信息
+4. **坐标转换**：将相机坐标系下的目标位置转换为地图坐标系
+
+**关键接口**：
+
+- 订阅：`/detections` (目标检测结果)、`/amcl_pose` (当前位姿)
+- 发布：`/cmd_vel` (速度控制)、`/joint_commands` (舵机控制)
+- Action：`/navigate_to_pose` (导航目标)
+
+### 5.3 启动文件编写
+
+**nav2_bringup.launch.py 职责**：
+
+- 启动 Map Server（加载 `hy_slam` 保存的地图）
+- 启动 AMCL 定位节点
+- 启动 Nav2 导航栈（通过 `navigation_launch.py`）
+- 启动 Lifecycle Manager 管理节点生命周期
+
+**butter_mission.launch.py 职责**：
+
+- 包含 `nav2_bringup.launch.py`
+- 启动任务调度节点 `butter_mission_node`
+- 传递参数：中心点坐标、搜索速度等
+
+## 6. 编译与运行
+
+### 6.1 编译功能包
+
+```bash
+cd ~/hy_linux/nfs/hy_ros
+colcon build --packages-select hy_nav2
+source install/setup.bash
+```
+
+### 6.2 启动系统
+
+**前置条件**：确保已完成 SLAM 建图并保存地图文件到 `install/hy_slam/share/hy_slam/map/`
+
+```bash
+# 终端 1：启动基础系统（雷达+底盘+里程计融合）
+ros2 launch ldlidar_driver_ros2 ldlidar_driver.launch.py &
+ros2 launch uart uart_launch.py &
+ros2 launch ekf_odom ekf_odom_launch.py &
+ros2 launch hy_slam laser_filter_only.launch.py
+
+# 终端 2：启动视觉检测（摄像头+YOLOv8+推流）
+ros2 launch rk_camera camera_inference_streamer.launch.py
+
+# 终端 3：启动 Nav2 导航栈
+ros2 launch hy_nav2 nav2_bringup.launch.py
+
+# 终端 4：启动任务调度节点
+ros2 launch hy_nav2 butter_mission.launch.py
+```
+
+```{tip}
+可使用 `tmux` 或 `screen` 管理多个终端，或参考 `all_launch` 功能包编写统一的 launch 文件整合所有节点。
+```
+
+## 7. 调试与验证
+
+### 7.1 检查系统状态
+
+**验证 TF 树完整性**
+
+```bash
+# 生成 TF 树图
+ros2 run tf2_tools view_frames
+
+# 检查关键坐标变换
+ros2 run tf2_ros tf2_echo map base_link
+```
+
+应包含完整链路：`map` → `odom` → `base_link` → `laser_link`
+
+**检查话题通信**
+
+```bash
+# 查看导航相关话题
+ros2 topic list | grep -E 'cmd_vel|odom|scan|map|amcl'
+
+# 查看目标检测结果
+ros2 topic echo /detections
+
+# 查看机器人位姿
+ros2 topic echo /amcl_pose
+```
+
+**检查 Action 服务**
+
+```bash
+# 查看可用 Action
+ros2 action list
+
+# 查看导航 Action 状态
+ros2 action info /navigate_to_pose
+```
+
+### 7.2 常见问题排查
+
+**问题 1：机器人不移动**
+
+- 检查 `/cmd_vel` 话题是否有数据：`ros2 topic hz /cmd_vel`
+- 检查 TF 树是否完整（特别是 `map` → `odom` 变换）
+- 确认底盘串口通信正常
+
+**问题 2：定位漂移**
+
+- 增加 AMCL 粒子数：`max_particles: 2000 → 3000`
+- 检查里程计数据质量：`ros2 topic echo /odom`
+- 确认地图与实际环境一致
+
+**问题 3：路径规划失败**
+
+- 检查代价地图：`ros2 topic echo /global_costmap/costmap --once`
+- 减小膨胀半径：`inflation_radius: 0.35 → 0.25`
+- 确认目标点在可达区域内
+
+**问题 4：搜索时未检测到黄油**
+
+- 检查视觉检测节点是否运行：`ros2 node list | grep inference`
+- 查看检测结果：`ros2 topic echo /detections`
+- 调整搜索旋转速度：`search_angular_speed: 0.5 → 0.3`
+
+### 7.3 Foxglove 可视化
+
+启动 Foxglove Bridge 进行实时监控：
+
+```bash
+ros2 run foxglove_bridge foxglove_bridge --ros-args -p port:=8765
+```
+
+在浏览器打开 [Foxglove Studio](https://foxglove.dev/studio)，连接到 `ws://<机器人IP>:8765`
+
+**推荐查看的面板**：
+
+- `/map`：静态地图
+- `/global_costmap/costmap`：全局代价地图
+- `/local_costmap/costmap`：局部代价地图（3m×3m 滚动窗口）
+- `/plan`：全局路径
+- `/local_plan`：局部轨迹
+- `/amcl_pose`：定位位姿
+- TF 树：坐标变换关系
+
+## 8. 参数调优建议
+
+### 8.1 速度参数
+
+根据实际测试调整机器人运动速度：
+
+- `max_vel_x: 0.15`：最大线速度，过大可能导致失控
+- `max_vel_theta: 1.0`：最大角速度，影响转弯灵活性
+- `acc_lim_x: 0.5`：线加速度限制，避免急加速
+- `acc_lim_theta: 1.5`：角加速度限制
+
+### 8.2 目标容差
+
+调整到达目标的精度要求：
+
+- `xy_goal_tolerance: 0.15`：位置容差（米），过小可能无法到达
+- `yaw_goal_tolerance: 0.25`：角度容差（弧度）
+
+### 8.3 代价地图参数
+
+- `robot_radius: 0.15`：机器人半径，需实测确定
+- `inflation_radius: 0.35`：膨胀半径，确保安全距离
+- `obstacle_max_range: 2.5`：障碍物检测最大距离
